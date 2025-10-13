@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AV‑AI Ops — Event Wizard (Fixed)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b1220; --card:#121a2b; --ink:#e6edff; --muted:#a7b0c6; --line:#223057; --accent:#6ea8fe; --ok:#59d18c; --bad:#ff6b6b; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:linear-gradient(180deg,#0a0f1b,#0e1530)}
+    .wrap{max-width:920px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{margin:0;font-size:24px}
+    .ai{display:flex;gap:8px;align-items:center}
+    input[type="text"],input[type="email"],input[type="time"],input[type="date"],textarea{background:#0c1323;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+    textarea{min-height:90px}
+    .btn{background:#152545;border:1px solid #2b3d66;color:var(--ink);border-radius:12px;padding:10px 14px;cursor:pointer}
+    .btn:hover{border-color:#3c58a0}
+    .btn.primary{background:#142851;border-color:#2b56a2}
+    .btn.ghost{background:transparent;border-color:#2b3d66}
+    .btn.bad{background:#3a1c1c;border-color:#6e2b2b}
+    .btn.ok{background:#123524;border-color:#1e6b43}
+    .choices{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+    .choice{border:1px solid #2b3d66;background:#0c1323;color:var(--ink);padding:10px 12px;border-radius:999px;cursor:pointer}
+    .choice.selected{outline:2px solid var(--accent)}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .muted{color:var(--muted)}
+    .hr{height:1px;background:var(--line);margin:16px 0}
+    .progress{height:6px;background:#0a0f1e;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+    .bar{height:100%;width:0;background:linear-gradient(90deg,#4f7cff,#7ab3ff)}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,8,20,.6);backdrop-filter:blur(3px)}
+    .panel{max-width:820px;width:92%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+    .pill{display:inline-block;padding:2px 8px;border:1px solid #2b3d66;border-radius:999px;margin:2px}
+    .toast{position:fixed;right:14px;bottom:14px;background:#0c1323;border:1px solid var(--line);border-radius:10px;padding:10px 12px;opacity:0;transform:translateY(8px);transition:all .25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .hidden{display:none}
+    .fallback{display:none;color:#ffb3b3}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header card">
+      <div>
+        <h1>AV‑AI Ops — Event Wizard</h1>
+        <div class="muted">Answer step‑by‑step.</div>
+      </div>
+      <div class="ai" style="flex:1">
+        <div id="instr" class="muted" style="line-height:1.4">
+          <strong>How to use:</strong> Begin by selecting <b>Event Type</b>. Hover any option to see what it includes. Use <b>Next</b>/<b>Skip</b> to move through steps. Review & Submit at the end.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="wizard">
+      <div class="progress"><div class="bar" id="bar"></div></div>
+      <div id="message" style="margin:12px 0 4px; font-weight:600"></div>
+      <div id="body"></div>
+      <div id="fallback" class="fallback">Script failed to load. If you see this, please refresh.</div>
+      <div class="hr"></div>
+      <div class="row" style="justify-content:space-between">
+        <button class="btn ghost" id="backBtn">◀ Back</button>
+        <div class="row">
+          <button class="btn" id="skipBtn">Skip</button>
+          <button class="btn ok" id="nextBtn">Next ▶</button>
+          <button class="btn primary" id="reviewBtn" style="display:none">Review & Submit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="panel">
+      <h3 id="confirmTitle" style="margin-top:0">Confirm Event Details</h3>
+      <p class="muted">Please review your selections before final submission. You can edit or submit below.</p>
+      <div id="confirmHtml"></div>
+      <pre id="confirmJson" class="hidden"></pre>
+      <div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px">
+        <button class="btn ghost" id="editBtn" type="button">✏️ Edit</button>
+        <button class="btn bad" id="cancelConfirm" type="button">Cancel</button>
+        <button class="btn ok" id="finalSubmit" type="button">Submit & Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (function(){
+    "use strict";
+
+    // Simple runtime guard
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+    const toast = (m)=>{ const t=$('#toast'); if(!t) return; t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); };
+
+    // Step model (ASCII-only labels to avoid encoding issues)
+    const BASE_STEPS = [
+      { key:'type', label:'What type of event is this?', kind:'choice', required:true,
+        options:['All-Hands','QBR','Town Hall','Product Launch','Training','Other']
+      },
+      { key:'event_name', label:'What is the event name?', kind:'text', required:true, placeholder:'e.g., Q4 All-Hands' },
+      { key:'date', label:'What is the date for the event?', kind:'date', required:true },
+      { key:'start', label:'What time does it start?', kind:'time', required:true },
+      { key:'end', label:'What time does it end?', kind:'time', required:true },
+      { key:'room', label:'Which room or venue?', kind:'text', required:true, placeholder:'e.g., SF-Auditorium' },
+      { key:'platform', label:'Which UC platform?', kind:'choice', required:true, options:['Zoom','Teams','Webex'] },
+      { key:'poc_name', label:'POC full name', kind:'text', required:true, placeholder:'Jane Doe' },
+      { key:'poc', label:'POC email', kind:'email', required:true, placeholder:'jane.doe@company.com' },
+      { key:'options', label:'Production options', kind:'multi', options:[
+        'Kick-Off Only','Entire Meeting Support','Video Camera','Remote Presenters','Special Guests / Executives','Local Q&A (mic runners)','Remote Q&A','Recording','PPT / Presentation','Videos (provide download link)','Handheld Mics','Lapel Mics','Intro Music (with instructions)','Clicker / Slide Advancer','Registration','Live Stream','Backup Room','ASL / Interpretation'
+      ] },
+      { key:'attachments', label:'Upload any documents (general)', kind:'file', multiple:true, required:false },
+      { key:'notes', label:'Any notes?', kind:'textarea', placeholder:'Walk-in 15 min, CEO intro, panel (5), Q&A...' }
+    ];
+
+    function computeSteps(state){
+      const steps = BASE_STEPS.slice();
+      const opts = state.options || [];
+      if (opts.includes('Special Guests / Executives')) steps.splice(10,0,{ key:'guests', label:'Add special guests / executives (name & email)', kind:'list' });
+      if (opts.includes('Remote Presenters')) steps.splice(10,0,{ key:'remote_presenters', label:'Add remote presenters (name & email)', kind:'list' });
+      if (opts.includes('PPT / Presentation')) steps.splice(steps.length-2,0,{ key:'slides', label:'Upload presentation deck (optional)', kind:'file' });
+      if (opts.includes('Videos (provide download link)')) steps.splice(steps.length-2,0,{ key:'video_files', label:'Upload video files (optional)', kind:'file', multiple:true });
+      return steps;
+    }
+
+    const state = { intent:'Event.Intake' };
+    let idx = 0;
+
+    function render(){
+      try {
+        const steps = computeSteps(state);
+        const step = steps[idx] || steps[0];
+        $('#message').textContent = step.label;
+        const pct = Math.floor((idx)/steps.length*100);
+        $('#bar').style.width = pct + '%';
+
+        const body = $('#body');
+        body.innerHTML = '';
+
+        $('#skipBtn').style.display = 'inline-block';
+        $('#backBtn').style.display = (idx>0) ? 'inline-block' : 'none';
+        $('#nextBtn').style.display = (idx < steps.length-1) ? 'inline-block' : 'none';
+        $('#reviewBtn').style.display = (idx === steps.length-1) ? 'inline-block' : 'none';
+
+        // Render per step kind
+        if (step.kind === 'choice'){
+          const wrap = document.createElement('div'); wrap.className='choices';
+          step.options.forEach(opt=>{
+            const b=document.createElement('button'); b.type='button'; b.className='choice'; b.textContent=opt;
+            b.onclick=()=>{
+              if (opt==='Other' && step.key==='type'){
+                const input = prompt('Enter event type');
+                if (input) state[step.key]=input; else return;
+              } else { state[step.key]=opt; }
+              // Visual selection
+              Array.from(wrap.children).forEach(c=>c.classList.remove('selected')); b.classList.add('selected');
+            };
+            wrap.appendChild(b);
+          });
+          body.appendChild(wrap);
+        } else if (step.kind === 'date'){
+          const i=document.createElement('input'); i.type='date'; i.value = state[step.key]||''; i.onchange=()=>state[step.key]=i.value; body.appendChild(i);
+        } else if (step.kind === 'time'){
+          const i=document.createElement('input'); i.type='time'; i.value = state[step.key]||''; i.onchange=()=>state[step.key]=i.value; body.appendChild(i);
+        } else if (step.kind === 'text' || step.kind==='email'){
+          const i=document.createElement('input'); i.type = step.kind==='email' ? 'email' : 'text'; i.placeholder=step.placeholder||''; i.value = state[step.key]||''; i.oninput=()=>state[step.key]=i.value; body.appendChild(i);
+        } else if (step.kind === 'textarea'){
+          const t=document.createElement('textarea'); t.placeholder=step.placeholder||''; t.value=state[step.key]||''; t.oninput=()=>state[step.key]=t.value; body.appendChild(t);
+        } else if (step.kind === 'multi'){
+          const wrap=document.createElement('div'); wrap.className='choices';
+          (step.options||[]).forEach(opt=>{
+            const b=document.createElement('button'); b.type='button'; b.className='choice'; b.textContent=opt;
+            b.onclick=()=>{
+              const set=new Set(state[step.key]||[]);
+              if (set.has(opt)) set.delete(opt); else set.add(opt);
+              state[step.key]=Array.from(set);
+              b.classList.toggle('selected');
+            };
+            wrap.appendChild(b);
+          });
+          body.appendChild(wrap);
+        } else if (step.kind === 'file'){
+          const i=document.createElement('input'); i.type='file'; if (step.multiple) i.multiple=true;
+          i.onchange=(e)=>{ state[step.key] = Array.from(e.target.files||[]).map(f=>({name:f.name,size:f.size,type:f.type})); };
+          body.appendChild(i);
+          const p = document.createElement('p'); p.className='muted'; p.textContent='Demo: files are kept client-side as metadata only.'; body.appendChild(p);
+        } else if (step.kind === 'list'){
+          const c=document.createElement('div');
+          const addRow=(pref={})=>{
+            const row=document.createElement('div'); row.className='row';
+            const n=document.createElement('input'); n.type='text'; n.placeholder='Full name'; n.value=pref.name||'';
+            const e=document.createElement('input'); e.type='email'; e.placeholder='email@company.com'; e.value=pref.email||'';
+            row.appendChild(n); row.appendChild(e);
+            c.appendChild(row);
+          };
+          (state[step.key]||[]).forEach(x=>addRow(x));
+          const addBtn=document.createElement('button'); addBtn.className='btn'; addBtn.type='button'; addBtn.textContent='Add person'; addBtn.onclick=()=>addRow();
+          body.appendChild(c); body.appendChild(addBtn);
+          // Attach special next/skip for list
+          $('#nextBtn').onclick = ()=>{
+            const rows=[...c.querySelectorAll('.row')];
+            state[step.key]=rows.map(r=>({name:r.children[0].value.trim(), email:r.children[1].value.trim()})).filter(x=>x.name||x.email);
+            advance();
+          };
+          $('#skipBtn').onclick = ()=>{ advance(); };
+          return; // stop default binding below
+        }
+
+        // Default bindings
+        $('#skipBtn').onclick = ()=>{ if (state[step.key]===undefined) state[step.key]=null; advance(); };
+        $('#nextBtn').onclick = advance;
+
+      } catch (e){
+        console.error(e);
+        const fb = $('#fallback'); if (fb) fb.style.display = 'block';
+      }
+    }
+
+    function buildPayload(){
+      return {
+        intent: 'Event.Intake',
+        name: state.event_name || inferName(state),
+        type: state.type,
+        date: state.date,
+        time: state.start,
+        end: state.end,
+        room: state.room,
+        platform: state.platform,
+        poc_name: state.poc_name,
+        poc: state.poc,
+        production_opts: state.options || [],
+        notes: state.notes || '',
+        guests: state.guests || [],
+        remote_presenters: state.remote_presenters || [],
+        slides: state.slides || [],
+        videos: state.video_files || [],
+        attachments: state.attachments || []
+      };
+    }
+
+    function inferName(s){
+      const base = (s.type||'Event');
+      const date = s.date || '';
+      return base + (date ? (' ' + date) : '');
+    }
+
+    function review(){
+      const p = buildPayload();
+      const html = [
+        ['Event Name', p.name],
+        ['Type', p.type||''],
+        ['Date', p.date||''],
+        ['Start', p.time||''],
+        ['End', p.end||''],
+        ['Room', p.room||''],
+        ['Platform', p.platform||''],
+        ['POC', (p.poc_name||'') + ' <' + (p.poc||'') + '>'],
+        ['Options', (p.production_opts||[]).map(x=>'<span class="pill">'+escapeHtml(x)+'</span>').join(' ')],
+        ['Guests/Execs', (p.guests||[]).map(g=>escapeHtml(g.name||'')+' &lt;'+escapeHtml(g.email||'')+'&gt;').join('<br>')],
+        ['Remote Presenters', (p.remote_presenters||[]).map(g=>escapeHtml(g.name||'')+' &lt;'+escapeHtml(g.email||'')+'&gt;').join('<br>')],
+        ['Slides', (p.slides||[]).map(f=>escapeHtml(f.name||'')).join('<br>')],
+        ['Videos', (p.videos||[]).map(f=>escapeHtml(f.name||'')).join('<br>')],
+        ['Attachments', (p.attachments||[]).map(f=>escapeHtml(f.name||'')).join('<br>')],
+        ['Notes', escapeHtml(p.notes||'')]
+      ].map(([k,v])=>'<tr><td>'+escapeHtml(k)+'</td><td>'+ (v||'') +'</td></tr>').join('');
+      document.getElementById('confirmHtml').innerHTML = '<table class="summary"><tr><th>Field</th><th>Value</th></tr>'+html+'</table>';
+      document.getElementById('confirmJson').textContent = JSON.stringify(p,null,2);
+      document.getElementById('confirmModal').style.display='flex';
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
+
+    function advance(){
+      const stepsNow = computeSteps(state);
+      const s = stepsNow[idx];
+      if (s && s.required && (state[s.key]===undefined || state[s.key]==='' || state[s.key]===null)){
+        toast('This step is required.');
+        return;
+      }
+      if (idx < stepsNow.length-1){ idx++; render(); } else { review(); }
+    }
+
+    // wiring
+    document.addEventListener('DOMContentLoaded', function(){
+      // primary buttons
+      $('#backBtn').addEventListener('click', function(){ if (idx>0){ idx--; render(); } });
+      $('#reviewBtn').addEventListener('click', review);
+      $('#cancelConfirm').addEventListener('click', function(){ $('#confirmModal').style.display='none'; });
+      $('#finalSubmit').addEventListener('click', function(){ $('#confirmModal').style.display='none'; toast('Submitted (demo)'); });
+
+      // initial render straight to step 1
+      render();
+    });
+  })();
+  </script>
+</body>
+</html>
