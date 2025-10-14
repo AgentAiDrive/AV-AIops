@@ -1,0 +1,1 @@
+export async function githubCreateGist(base,payload){const r=await fetch(`${base}/api/gist/create`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});return r.json();} export async function githubTest(base){return (await fetch(`${base}/api/test`)).json();}

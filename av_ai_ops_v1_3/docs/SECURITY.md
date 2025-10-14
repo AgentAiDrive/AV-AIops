@@ -1,0 +1,1 @@
+No secrets in browser. CORS limited to localhost. Use OAuth only in the MCP servers.

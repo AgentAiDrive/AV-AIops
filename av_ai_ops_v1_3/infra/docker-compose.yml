@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  mcp-slack:
+    build: ../mcp-tools/mcp-slack
+    environment: [PORT_SLACK=8080]
+    ports: ["8401:8080"]
+  mcp-zoom:
+    build: ../mcp-tools/mcp-zoom
+    environment: [PORT_ZOOM=8080]
+    ports: ["8402:8080"]
+  mcp-github:
+    build: ../mcp-tools/mcp-github
+    environment: [PORT_GITHUB=8080]
+    ports: ["8403:8080"]
+  mcp-gdrive:
+    build: ../mcp-tools/mcp-gdrive
+    environment: [PORT_GDRIVE=8080]
+    ports: ["8404:8080"]
+  mcp-servicenow:
+    build: ../mcp-tools/mcp-servicenow
+    environment: [PORT_SNOW=8080]
+    ports: ["8405:8080"]
+  mcp-search:
+    build: ../mcp-tools/mcp-search
+    environment: [PORT_SEARCH=8080]
+    ports: ["8406:8080"]
+  wizard:
+    image: nginx:alpine
+    volumes: ["../apps/av-wizard:/usr/share/nginx/html:ro"]
+    ports: ["5173:80"]

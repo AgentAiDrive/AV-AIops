@@ -1,0 +1,1 @@
+export function route(routes){const el=document.getElementById('app');const key=location.hash||'#/welcome';const View=routes[key]||routes['#/welcome'];el.innerHTML='';const node=View();if(node instanceof HTMLElement) el.appendChild(node); else el.innerHTML=node;}
