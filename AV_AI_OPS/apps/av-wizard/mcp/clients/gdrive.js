@@ -1,0 +1,1 @@
+export async function gdriveCreateFile(base,payload){const r=await fetch(`${base}/api/file/create`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});return r.json();} export async function gdriveTest(base){return (await fetch(`${base}/api/test`)).json();}

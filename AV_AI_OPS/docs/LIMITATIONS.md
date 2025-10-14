@@ -1,0 +1,1 @@
+This starter is a baseline; extend workers and servers for production.

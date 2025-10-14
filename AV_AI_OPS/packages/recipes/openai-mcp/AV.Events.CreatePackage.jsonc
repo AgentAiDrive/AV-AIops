@@ -1,0 +1,12 @@
+// jsonc
+[
+  {"role":"developer","content":"Create an AV event in ServiceNow and calendar; then provision the platform. Tools: servicenow.create_record, calendar.create_event, zoom.webinar.create | teams.live_event.create | webex.webinar.create. Output EventAutomation {event_sys_id:string, calendar_id?:string, platform_id?:string, notes:string}."},
+  {"role":"user","content":"Create {{event_type}} '{{title}}' on {{date}} {{start}}–{{end}} {{tz}}, at {{location}}, platform {{platform}}. Registration: {{registration_yes_no}}. Options: {{options_csv}}. POC {{poc_name}} {{poc_email}}."},
+  {"role":"assistant","recipient":"servicenow.create_record","content":"{\"table\":\"x_avaici_av_event\",\"record\":{\"u_event_type\":\"{{event_type}}\",\"short_description\":\"{{title}}\",\"u_start\":\"{{date}}T{{start}}\",\"u_end\":\"{{date}}T{{end}}\",\"u_timezone\":\"{{tz}}\",\"u_location\":\"{{location}}\",\"u_platform\":\"{{platform}}\",\"u_poc_name\":\"{{poc_name}}\",\"u_poc_email\":\"{{poc_email}}\",\"u_registration_required\":{{registration_bool}}}}"},
+  {"role":"tool","name":"servicenow.create_record","content":"{\"sys_id\":\"$SN_EVENT\"}"},
+  {"role":"assistant","recipient":"calendar.create_event","content":"{\"title\":\"{{title}}\",\"start\":\"{{date}}T{{start}} {{tz}}\",\"end\":\"{{date}}T{{end}} {{tz}}\",\"location\":\"{{location}}\",\"description\":\"{{event_type}} | Options: {{options_csv}}\"}"},
+  {"role":"tool","name":"calendar.create_event","content":"{\"id\":\"$CAL\"}"},
+  {"role":"assistant","recipient":"{{platform_tool}}","content":"{\"title\":\"{{title}}\",\"start\":\"{{date}}T{{start}}Z\",\"duration_min\":{{duration_min}},\"registration\":{{registration_bool}}}"},
+  {"role":"tool","name":"{{platform_tool}}","content":"{\"id\":\"$PLAT\"}"},
+  {"role":"assistant","content":"{\"event_sys_id\":\"$SN_EVENT\",\"calendar_id\":\"$CAL\",\"platform_id\":\"$PLAT\",\"notes\":\"Created {{event_type}} with {{options_csv}}\"}"}
+]

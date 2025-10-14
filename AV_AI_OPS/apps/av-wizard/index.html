@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AV AI OPS — Wizard</title>
+  <link rel="stylesheet" href="./styles/tailwind-lite.css">
+  <link rel="icon" href="./assets/logo.svg">
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <main class="max-w-5xl mx-auto p-4">
+   <!-- AFTER (replace the whole header block with this) -->
+<header class="mb-4">
+  <div class="flex items-center gap-3">
+    <img src="./assets/logo.svg" width="32" height="32" alt="logo"/>
+    <h1 class="text-xl font-semibold">AV AI OPS — Pilot Wizard</h1>
+  </div>
+
+  <!-- Tooltip badges row -->
+  <div class="row" id="stack-badges" style="gap:8px; margin:12px 0 20px">
+    <button class="pill tip" tabindex="0"
+      data-tip="Runs as pure ES modules; no build step. Best served via http://localhost (e.g., python -m http.server).">
+      Static HTML/JS
+    </button>
+
+    <button class="pill tip" tabindex="0"
+      data-tip="Local browser database for config, recipes, and logs. Export/Import from Review/Dashboard. No secrets stored here.">
+      IndexedDB
+    </button>
+
+    <button class="pill tip" tabindex="0"
+      data-tip="Agents run off the UI thread. In mock mode they simulate tools; in real mode they call your local MCP servers.">
+      Web Workers
+    </button>
+  </div>
+</header>
+
+    <nav class="nav mb-3">
+      <a href="#/welcome" class="btn">Welcome</a>
+      <a href="#/integrations" class="btn">Integrations</a>
+      <a href="#/agents" class="btn">Agents</a>
+      <a href="#/optimization" class="btn">Optimization</a>
+      <a href="#/recipes" class="btn">Recipes</a>
+      <a href="#/review" class="btn">Review</a>
+      <a href="#/launch" class="btn">Launch</a>
+      <a href="#/dashboard" class="btn">Dashboard</a>
+    </nav>
+    <section id="app"></section>
+  </main>
+<script type="module">
+  // Set a default *before* any import so the first render always has a route.
+  if (!location.hash) location.hash = '#/welcome';
+
+  import { route } from './lib/router.js';
+  import { initDB } from './db/store.js';
+  import { Welcome } from './pages/welcome.js';
+  import { Integrations } from './pages/integrations.js';
+  import { Agents } from './pages/agents.js';
+  import { Optimization } from './pages/optimization.js';
+  import { Recipes } from './pages/recipes.js';
+  import { Review } from './pages/review.js';
+  import { Launch } from './pages/launch.js';
+  import { Dashboard } from './pages/dashboard.js';
+
+  const routes = {
+    '#/welcome': Welcome,
+    '#/integrations': Integrations,
+    '#/agents': Agents,
+    '#/optimization': Optimization,
+    '#/recipes': Recipes,
+    '#/review': Review,
+    '#/launch': Launch,
+    '#/dashboard': Dashboard
+  };
+
+  // Make clicks on the nav always update the hash (and prevent weird default behavior).
+  const nav = document.querySelector('nav.nav') || document.querySelector('nav');
+  if (nav) {
+    nav.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href^="#/"]');
+      if (!a) return;
+      e.preventDefault();
+      const href = a.getAttribute('href');
+      if (href && href !== location.hash) {
+        location.hash = href;
+      } else {
+        // If clicking the active tab, still re-route (useful during dev)
+        route(routes);
+      }
+    }, true);
+  }
+
+  async function main() {
+    await initDB();
+    // First paint
+    route(routes);
+    // Listen for hash changes (e.g., back/forward buttons)
+    window.addEventListener('hashchange', () => route(routes));
+  }
+  main();
+</script>
+</body>
+</html>
