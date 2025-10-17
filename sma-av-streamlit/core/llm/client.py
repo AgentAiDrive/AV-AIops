@@ -62,7 +62,6 @@ def _oai_chat(client: Any, messages: List[Dict[str, str]], json_mode: bool) -> s
     resp = client.chat.completions.create(
         model=model,
         messages=oai_msgs,
-        temperature=0.2,
         response_format={"type": "json_object"} if json_mode else None,
     )
     out = resp.choices[0].message.content
@@ -85,7 +84,6 @@ def _anth_chat(client: Any, messages: List[Dict[str, str]], json_mode: bool) -> 
         max_tokens=2048,
         system=system or None,
         messages=turns,
-        temperature=0.2,
         metadata={"json_mode": json_mode},
     )
     parts = []
