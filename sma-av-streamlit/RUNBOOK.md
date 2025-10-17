@@ -51,19 +51,6 @@ Dashboard
 
 ---
 
-## Global “Page Help” (paste at the first line of each page)
-
-Use a quick banner to orient users. Example:
-
-```python
-import streamlit as st
-st.info("How to use this page: see the top-right ‘…’ menu → Help if needed. This page participates in IPAV: Intake → Plan → Act → Verify.")
-```
-
-Then add a one-liner per page (below).
-
----
-
 ## 🏁 Setup Wizard
 
 **Purpose**  
@@ -88,35 +75,6 @@ Then add a one-liner per page (below).
 **Purpose**  
 - Choose active LLM provider (OpenAI ↔ Anthropic) for Chat/SOP/Recipe generation.
 - Toggle **Mock MCP** mode to avoid hitting external APIs.
-
-**Drop-in snippet**  
-```python
-import os, streamlit as st
-st.title("⚙️ Settings")
-
-provider = st.radio("LLM provider", ["OpenAI", "Anthropic"],
-                    index=0 if st.session_state.get("llm_provider","OpenAI")=="OpenAI" else 1,
-                    horizontal=True)
-st.session_state["llm_provider"] = provider
-dot = "🟢" if provider == "OpenAI" else "🔵"
-st.caption(f"Active model: {dot} {provider}")
-
-with st.expander("API keys & environment"):
-    openai = st.text_input("OPENAI_API_KEY", type="password", value=os.getenv("OPENAI_API_KEY",""))
-    anthropic = st.text_input("ANTHROPIC_API_KEY", type="password", value=os.getenv("ANTHROPIC_API_KEY",""))
-    mock = st.toggle("Mock MCP Tools (no external calls)", value=st.session_state.get("mock_mcp", True))
-    if st.button("Save"):
-        st.session_state["OPENAI_API_KEY"] = openai
-        st.session_state["ANTHROPIC_API_KEY"] = anthropic
-        st.session_state["mock_mcp"] = mock
-        st.success("Saved for this session. Use .env for persistence.")
-```
-
-**Optional sidebar indicator (in `app.py`)**  
-```python
-p = (st.session_state.get("llm_provider") or "OpenAI")
-st.sidebar.markdown(f"**Model**: {'🟢' if p=='OpenAI' else '🔵'} {p}")
-```
 
 **IPAV**  
 - Intake: provider & keys  
