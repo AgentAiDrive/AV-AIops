@@ -1,4 +1,4 @@
-# pages/02_Settings.py
+# pages/6_Settings.py
 import os
 import streamlit as st
 
