@@ -8,7 +8,11 @@ from core.recipes.attach import attach_recipe_to_agent
 from core.mcp.from_sop_tools import ensure_tools_for_sop
 from core.db.session import get_session
 from core.workflow.engine import execute_recipe_run
+import streamlit as st
+from core.ui.page_tips import show as show_tip
 
+PAGE_KEY = "Chat"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 # New: robust secret handling + provider selection
 from core.secrets import get_active_key, is_mock_enabled, pick_active_provider
 
