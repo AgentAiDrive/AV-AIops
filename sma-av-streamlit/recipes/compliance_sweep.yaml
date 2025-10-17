@@ -1,0 +1,14 @@
+
+name: Compliance Sweep
+description: Routine sweep to ensure all AV devices are compliant with the latest firmware and policy versions.
+intake:
+  - gather: device_list
+plan:
+  - step: Identify devices needing updates
+  - step: Prepare update schedule
+act:
+  - action: Push firmware updates
+  - action: Apply configuration policies
+verify:
+  - check: Generate compliance report
+  - check: Notify admins of completion
