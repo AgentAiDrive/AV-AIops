@@ -5,6 +5,12 @@ from core.db.models import Recipe
 from core.recipes.service import list_recipe_files, load_recipe_dict, save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
 import os
+# paste this at the top of any page
+import streamlit as st
+from core.ui.page_tips import show as show_tip
+
+PAGE_KEY = "Recipes"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 
 st.title("📜 Recipes")
 
