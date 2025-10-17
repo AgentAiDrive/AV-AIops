@@ -5,7 +5,6 @@ from pathlib import Path
 import streamlit as st
 
 # Try to import the shared tips so Help stays in sync with page tooltips.
-# If the module isn't present, fall back to a local dict.
 try:
     from core.ui.page_tips import PAGE_TIPS  # type: ignore
 except Exception:
@@ -24,15 +23,11 @@ st.title("❓ Help & Runbook")
 
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
-    """
-    Start at this file (pages/99_Help.py), walk up a few levels to find
-    the app root (where app.py / core / pages live).
-    """
+    """Walk up from this file to find the app root (where app.py / core / pages live)."""
     here = Path(__file__).resolve()
     for p in [here.parent, *here.parents]:
         if (p / "app.py").exists() or (p / "core").is_dir():
             return p
-    # Fallback: use CWD if nothing matched
     return Path.cwd()
 
 APP_ROOT = find_repo_root()
@@ -45,11 +40,6 @@ candidates = [
     CWD / "RUNBOOK.md",
 ]
 runbook_path = next((p for p in candidates if p.exists()), None)
-
-with st.expander("Where I'm looking for RUNBOOK.md (debug)", expanded=False):
-    st.caption(f"App root resolved to: `{APP_ROOT}`")
-    st.caption(f"Working dir: `{CWD}`")
-    st.code("\n".join(str(c) for c in candidates), language="text")
 
 # ---------------- Load runbook text ----------------
 if not runbook_path:
@@ -109,3 +99,19 @@ st.download_button("Download RUNBOOK.md", data=runbook_md, file_name="RUNBOOK.md
 st.divider()
 st.markdown(filtered_md, unsafe_allow_html=False)
 
+# ---------------- Optional debug (moved to bottom) ----------------
+def _get_query_params():
+    try:
+        # Newer Streamlit
+        return dict(st.query_params)
+    except Exception:
+        # Back-compat
+        return st.experimental_get_query_params()  # type: ignore[attr-defined]
+
+qp = _get_query_params()
+debug_on = str(qp.get("debug", ["0"])[0]).lower() in ("1", "true", "yes")
+
+with st.expander("Debug: where I'm looking for RUNBOOK.md", expanded=debug_on):
+    st.caption(f"App root resolved to: `{APP_ROOT}`")
+    st.caption(f"Working dir: `{CWD}`")
+    st.code("\n".join(str(c) for c in candidates), language="text")
