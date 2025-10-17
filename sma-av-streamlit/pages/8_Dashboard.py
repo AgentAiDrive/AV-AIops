@@ -107,5 +107,45 @@ with right:
                 if a.get("data"):
                     st.json(a["data"])
 
+store = RunStore()  # same file/path as in service.py
 
+colA, colB = st.columns([2,1])
+with colA:
+    hours = st.slider("Window (hours)", 1, 168, 24)
+with colB:
+    limit = st.number_input("Show recent runs", min_value=5, max_value=100, value=20, step=5)
 
+stats = store.stats(hours=hours)
+st.metric("Runs", stats["runs"])
+st.metric("Success %", f"{stats['success_rate']:.1f}%")
+st.metric("p95 duration (s)", f"{stats['p95_s']:.2f}")
+
+st.subheader("Recent Runs")
+for r in store.recent(limit=limit, hours=hours):
+    badge = "🟢" if r["ok"] else "🔴"
+    title = r.get("title") or "Run"
+    meta = r.get("meta", {})
+    wf = meta.get("workflow_name") or meta.get("workflow_id")
+    st.markdown(
+        f"{badge} **{title}**"
+        + (f" · _{wf}_" if wf else "")
+        + f" · {r['started_at']} → {r['finished_at']} ({r['duration_s']:.2f}s)"
+    )
+    if meta:
+        with st.expander("Meta"):
+            st.json(meta)
+    if r.get("error"):
+        st.error(r["error"])
+
+st.subheader("Workflows")
+with get_session() as db:  # type: ignore
+    wfs = list_workflows(db)
+    if not wfs:
+        st.info("No workflows defined yet.")
+    for wf in wfs:
+        status_color = {"green":"🟢","yellow":"🟡","red":"🔴"}.get(wf.enabled and "green" or "red", "🟡")
+        st.markdown(
+            f"{status_color} **{wf.name}** · Agent `{wf.agent_id}` · Recipe `{wf.recipe_id}`"
+            f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
+            unsafe_allow_html=True
+        )
