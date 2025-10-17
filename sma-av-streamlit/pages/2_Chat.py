@@ -44,7 +44,7 @@ with st.sidebar:
     
     /tool action servicenow {"action":"create_kb","args":{"title":"Zoom HDMI Black","html":"<h2>Symptoms…</h2><p>HDMI input shows black screen…</p>"}}
     
-    /kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com
+    /kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com'''"""
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
 provider_key, provider_name, key_source = get_active_key()  # ('openai'|'anthropic') and the key + source string
@@ -173,4 +173,4 @@ if prompt:
                         st.success("Provider call succeeded.")
                         st.code(t)
                     except Exception as e:
-                        st.error(f"Provider call failed: {type(e).__name__}: {e}")
+                        st.error(f"Provider call failed: {type(e).__name__}: {e}""")
