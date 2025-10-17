@@ -2,6 +2,12 @@
 import streamlit as st
 import os, json
 from core.mcp.scaffold import scaffold
+# paste this at the top of any page
+import streamlit as st
+from core.ui.page_tips import show as show_tip
+
+PAGE_KEY = "MCP Tools"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 
 st.title("🧰 MCP Tools")
 tools_dir = os.path.join(os.getcwd(), "core", "mcp", "tools")
