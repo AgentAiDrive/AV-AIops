@@ -87,6 +87,8 @@ def _oai_chat(client: Any, messages: List[Dict[str, str]], json_mode: bool) -> s
 
 def _anth_chat(client: Any, messages: List[Dict[str, str]], json_mode: bool) -> str:
     model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20240620")
+
+    # Build Anthropic-compatible conversation
     system = ""
     turns = []
     for m in messages:
@@ -95,14 +97,26 @@ def _anth_chat(client: Any, messages: List[Dict[str, str]], json_mode: bool) -> 
             system = content
         elif role in ("user", "assistant"):
             turns.append({"role": role, "content": content})
+
+    # If caller requested JSON, instruct via system message (no metadata hacks)
+    if json_mode:
+        extra_json_instr = (
+            "\n\nYou must return ONLY a single valid JSON object. "
+            "Do not include any prose or code fences."
+        )
+        system = (system or "") + extra_json_instr
+
     resp = client.messages.create(
         model=model,
         max_tokens=2048,
         system=system or None,
         messages=turns,
         temperature=0.2,
-        metadata={"json_mode": json_mode},
+        # DO NOT send arbitrary keys in metadata; Anthropic rejects unknown fields.
+        # metadata={"user_id": "avops"}  # optional, if you want a user_id
     )
+
+    # Collapse text blocks into a single string
     parts = []
     for blk in getattr(resp, "content", []):
         if getattr(blk, "type", "") == "text":
