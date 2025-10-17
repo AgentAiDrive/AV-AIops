@@ -85,8 +85,8 @@ with left:
         with st.expander(f"[{s['phase']}] {s['message']}  —  {s['status']} · {s['ts']}", expanded=False):
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown("**Payload**")
-                st.json(s["payload"] or {})
+    st.markdown("**Payload**")
+    st.json(s["payload"] or {})
             with c2:
                 st.markdown("**Result**")
                 st.json(s["result"] or {})
@@ -106,4 +106,5 @@ with right:
                     st.caption(f"id: {a['external_id']}")
                 if a.get("data"):
                     st.json(a["data"])
+
 
