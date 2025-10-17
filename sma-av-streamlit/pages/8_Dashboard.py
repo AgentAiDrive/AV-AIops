@@ -14,9 +14,10 @@ from core.ui.page_tips import show as show_tip
 PAGE_KEY = "Dashboard"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
 show_tip(PAGE_KEY)
 
-st.set_page_config(page_title="AV AI OPS — Dashboard", layout="wide")
+st.set_page_config(page_title="Dashboard", layout="wide")
+
 st.title("Dashboard")
-st.caption("Live view of workflow runs, steps, artifacts, and KPIs.")
+st.caption("AV AI OPS — Dashboard. Live view of workflow runs, steps, artifacts, and KPIs.")
 
 # Store init
 db_path = Path(__file__).resolve().parents[1] / "avops.db"
@@ -113,4 +114,5 @@ with right:
                     st.caption(f"id: {a['external_id']}")
                 if a.get("data"):
                     st.json(a["data"])
+
 
