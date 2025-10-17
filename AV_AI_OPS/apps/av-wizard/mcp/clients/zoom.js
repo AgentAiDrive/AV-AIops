@@ -1,1 +1,0 @@
-export async function zoomCreateWebinar(base,payload){const r=await fetch(`${base}/api/webinar/create`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});return r.json();} export async function zoomTest(base){return (await fetch(`${base}/api/test`)).json();}

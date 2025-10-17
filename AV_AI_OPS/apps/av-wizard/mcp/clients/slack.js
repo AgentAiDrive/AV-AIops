@@ -1,1 +1,0 @@
-export async function slackPost(base,payload){const r=await fetch(`${base}/api/postMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});return r.json();} export async function slackTest(base){return (await fetch(`${base}/api/test`)).json();}

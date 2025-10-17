@@ -1,1 +1,0 @@
-If a tool goes red, check server window, verify port, restart.
