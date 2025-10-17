@@ -1,0 +1,82 @@
+# pages/99_Help.py
+from __future__ import annotations
+import re, pathlib
+import streamlit as st
+
+# --- Shared tips mapping (kept here so Help page stands alone; same text as the utility) ---
+PAGE_TIPS = {
+    "Setup Wizard": "Initialize DB, seed demo agents/tools/recipes, and sample workflows. Safe to run multiple times.",
+    "Settings": "Choose active LLM (OpenAI↔Anthropic) for Chat/recipes/SOPs. Indicator shows which model is active.",
+    "Chat": "Slash commands to generate SOPs → Recipes → Run. Toggle JSON mode for raw payloads.",
+    "Agents": "Create agents, choose a recipe, trigger a run. Results appear in Dashboard → Runs.",
+    "Recipes": "Author YAML recipes in IPAV format; validate, version, and save to the library.",
+    "MCP Tools": "Discover local connectors (slack/zoom/servicenow). Check `/health` and call `/action` with JSON body.",
+    "Workflows": "Wire Agent + Recipe + Trigger (manual/interval). Every run records IPAV steps & artifacts.",
+    "Dashboard": "KPIs (runs, success %, p95 duration), trends, and run details (steps + artifacts).",
+}
+
+st.title("❓ Help & Runbook")
+
+# ---- Global Tips Summary -----------------------------------------------------
+with st.expander("Global Page Tips (quick reference)", expanded=True):
+    cols = st.columns(2)
+    keys = list(PAGE_TIPS.keys())
+    for i, k in enumerate(keys):
+        with cols[i % 2]:
+            st.markdown(f"**{k}**")
+            st.caption(PAGE_TIPS[k])
+
+st.divider()
+
+# ---- Runbook Loader ----------------------------------------------------------
+candidates = [pathlib.Path("docs/RUNBOOK.md"), pathlib.Path("RUNBOOK.md")]
+runbook_path = next((p for p in candidates if p.exists()), None)
+
+if not runbook_path:
+    st.warning("RUNBOOK.md not found (looked in `docs/RUNBOOK.md` and `RUNBOOK.md`). Showing a minimal placeholder.")
+    runbook_md = """# SMA AV-AI Ops — Runbook (Placeholder)
+
+Please add your full runbook at `docs/RUNBOOK.md` or `RUNBOOK.md`.
+"""
+else:
+    runbook_md = runbook_path.read_text(encoding="utf-8")
+
+# Build Table of Contents from headings
+def build_toc(md: str):
+    lines = md.splitlines()
+    items = []
+    for ln in lines:
+        m = re.match(r"^(#{1,3})\s+(.*)", ln)
+        if not m:
+            continue
+        level = len(m.group(1))
+        title = m.group(2).strip()
+        # Create GitHub-like anchor
+        anchor = re.sub(r"[^\w\- ]", "", title).strip().lower().replace(" ", "-")
+        items.append((level, title, anchor))
+    return items
+
+toc = build_toc(runbook_md)
+
+# Search box to filter within runbook
+q = st.text_input("Search the runbook", value="", placeholder="type to filter headings & body...")
+filtered_md = runbook_md
+if q.strip():
+    # naive filter: emphasize matches
+    pat = re.compile(re.escape(q), re.IGNORECASE)
+    filtered_md = pat.sub(lambda m: f"**{m.group(0)}**", runbook_md)
+
+# Render TOC
+with st.expander("Table of Contents", expanded=True):
+    if not toc:
+        st.caption("No headings found.")
+    else:
+        for level, title, anchor in toc:
+            indent = "&nbsp;" * (level - 1) * 4
+            st.markdown(f"{indent}• [{title}](#{anchor})", unsafe_allow_html=True)
+
+# Download button
+st.download_button("Download RUNBOOK.md", data=runbook_md, file_name="RUNBOOK.md", mime="text/markdown")
+
+st.divider()
+st.markdown(filtered_md, unsafe_allow_html=False)
