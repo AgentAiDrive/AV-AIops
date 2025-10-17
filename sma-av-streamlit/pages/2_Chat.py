@@ -24,6 +24,27 @@ with st.sidebar:
     st.markdown("Use **/sop** to convert text → recipe → attach → run. Example:")
     st.code("/sop Agent=Support Name=Projector Reset\nSteps:\n- Gather_room\n- Reset projector\n- Verify image via Slack")
     json_mode = st.checkbox("JSON mode (raw tool payloads)", value=False)
+    st.markdown(
+        r"""
+    **Slash commands (copy/paste)**
+    ```text
+    /sop Agent=Support Name=Projector Reset
+    Steps:
+    - Gather room_id
+    - Reset projector via Q-SYS
+    - Verify image via Slack
+    
+    /recipe new Projector Reset
+    
+    /recipe attach agent=Support recipe="Projector Reset"
+    
+    /agent run Support recipe="Projector Reset"
+    
+    /tool health slack
+    
+    /tool action servicenow {"action":"create_kb","args":{"title":"Zoom HDMI Black","html":"<h2>Symptoms…</h2><p>HDMI input shows black screen…</p>"}}
+    
+    /kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
 provider_key, provider_name, key_source = get_active_key()  # ('openai'|'anthropic') and the key + source string
