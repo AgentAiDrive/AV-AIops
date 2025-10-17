@@ -1,1 +1,0 @@
-self.onmessage=(e)=>{if(e.data?.type==='start'){postMessage('started');postMessage('routing online');}};

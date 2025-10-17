@@ -1,1 +1,0 @@
-Double-click index.html to run in mock mode. Use start_all_mcp.bat for real mode via localhost MCP servers.

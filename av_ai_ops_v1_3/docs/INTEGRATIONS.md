@@ -1,1 +1,0 @@
-Configure MCP URLs in Integrations step. Secrets live only in server .env files.

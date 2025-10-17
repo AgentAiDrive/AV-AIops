@@ -1,1 +1,0 @@
-Agents are Web Workers. They start on Launch and send logs to the Dashboard.
