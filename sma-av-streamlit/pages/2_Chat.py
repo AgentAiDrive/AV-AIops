@@ -142,3 +142,10 @@ if prompt:
                         "- Make sure you didn’t save blank overrides in Settings\n"
                         "- Check network egress and org policy for outbound API calls"
                     )
+                with st.expander("LLM self-test (temporary)"):
+                    try:
+                        t = chat([{"role":"system","content":"You are test."},{"role":"user","content":"Say 'real' if this is a real provider call."}], json_mode=False)
+                        st.success("Provider call succeeded.")
+                        st.code(t)
+                    except Exception as e:
+                        st.error(f"Provider call failed: {type(e).__name__}: {e}")
