@@ -19,8 +19,9 @@ app
 📜 Recipes
 🧰 MCP Tools
 ⚙️ Settings
-Dashboard
 🧩 Workflows
+OO Dashboard
+?? Help
 ```
 
 > Tip: Streamlit orders pages by file name, but this runbook references the **labels** you see in the sidebar.
