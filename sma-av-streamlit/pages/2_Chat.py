@@ -13,13 +13,6 @@ from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled, pick_active_provider
 
 st.title("💬 Chat")
-#
-from core.llm.client import refresh_client
-
-# ... after you resolved provider_name ...
-if st.session_state.get("_last_provider") != provider_name:
-    refresh_client()
-    st.session_state["_last_provider"] = provider_name
 
 # --- Sidebar helpers ---------------------------------------------------------
 with st.sidebar:
