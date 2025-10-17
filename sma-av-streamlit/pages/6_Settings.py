@@ -10,6 +10,12 @@ from core.secrets import (
     pick_active_provider,
 )
 from core.llm.client import refresh_client, whoami
+# paste this at the top of any page
+import streamlit as st
+from core.ui.page_tips import show as show_tip
+
+PAGE_KEY = "Settings"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 
 st.title("⚙️ Settings")
 
