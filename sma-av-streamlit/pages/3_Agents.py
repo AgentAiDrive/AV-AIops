@@ -4,6 +4,12 @@ from core.db.session import get_session
 from core.db.models import Agent, Recipe
 from core.workflow.engine import execute_recipe_run
 from core.runs_store import RunStore
+# paste this at the top of any page
+import streamlit as st
+from core.ui.page_tips import show as show_tip
+
+PAGE_KEY = "Agents"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 
 st.title("🤖 Agents")
 
