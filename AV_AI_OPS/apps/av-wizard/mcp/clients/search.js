@@ -1,1 +1,0 @@
-export async function searchDocs(base,q,domains=[]){const r=await fetch(`${base}/api/search?q=${encodeURIComponent(q)}&domains=${encodeURIComponent(domains.join(','))}`);return r.json();} export async function searchTest(base){return (await fetch(`${base}/api/test`)).json();}
