@@ -1,0 +1,17 @@
+
+name: Backup Room Failover
+description: Transition to a backup room and notify participants.
+intake:
+  - gather: primary_room_id
+  - gather: backup_room_id
+  - gather: schedule
+plan:
+  - step: Verify backup room availability
+  - step: Review booking conflicts
+act:
+  - action: Release primary room resources
+  - action: Reserve backup room
+  - action: Update calendar invitations
+verify:
+  - check: Confirm calendar updates
+  - check: Send confirmation via Slack

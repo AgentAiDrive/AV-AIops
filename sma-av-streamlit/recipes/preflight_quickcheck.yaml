@@ -1,0 +1,15 @@
+
+name: Preflight Quickcheck
+description: Ensure that conference room equipment is operational before a meeting.
+intake:
+  - gather: room_id
+  - gather: meeting_id
+plan:
+  - step: Check lights
+  - step: Check microphone and speakers
+act:
+  - action: Ping room devices
+  - action: Adjust lighting to default preset
+verify:
+  - check: Report device status
+  - check: Confirm with user via Slack
