@@ -7,6 +7,12 @@ from core.workflow.service import (
     list_workflows, create_workflow, update_workflow, delete_workflow,
     run_now, compute_status, tick
 )
+# paste this at the top of any page
+import streamlit as st
+from core.ui.page_tips import show as show_tip
+
+PAGE_KEY = "Workflows"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+show_tip(PAGE_KEY)
 
 st.title("🧩 Workflows")
 init_db()
