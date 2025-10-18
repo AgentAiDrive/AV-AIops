@@ -1,4 +1,11 @@
-"""Dedicated run detail view with pagination for steps and artifacts."""
+"""
+Dedicated run detail view with pagination for steps and artifacts.
+
+This page renders the details of a single workflow run, including its
+status, duration, any error message, metadata, step-by-step events, and
+produced artifacts.  Pagination controls are provided for long runs.
+"""
+
 from __future__ import annotations
 
 import math
@@ -12,6 +19,7 @@ from core.runs_store import RunStore
 
 
 def _make_store() -> RunStore:
+    """Create a RunStore instance to retrieve run details."""
     db_path = Path(__file__).resolve().parents[1] / "avops.db"
     try:
         return RunStore(db_path=db_path)
@@ -20,6 +28,7 @@ def _make_store() -> RunStore:
 
 
 def _to_dt(value: Any) -> datetime | None:
+    """Normalize timestamps to timezone-aware datetime objects."""
     if not value:
         return None
     if isinstance(value, datetime):
@@ -31,12 +40,14 @@ def _to_dt(value: Any) -> datetime | None:
 
 
 def _get_params() -> Dict[str, Any]:
+    """Retrieve query parameters in a backwards-compatible way."""
     if hasattr(st, "query_params"):
         return dict(st.query_params)
     return st.experimental_get_query_params()  # type: ignore[attr-defined]
 
 
 def _ensure_int(value: Any) -> Any:
+    """Convert a string to an int when possible; otherwise return original."""
     try:
         return int(value)
     except Exception:
@@ -63,6 +74,7 @@ if not detail:
     st.error(f"Run {run_id} was not found in RunStore.")
     st.stop()
 
+# Link back to the dashboard page
 st.page_link("pages/8_Dashboard.py", label="⬅ Back to dashboard", icon="⬅")
 
 started_at = _to_dt(detail.get("started_at"))
