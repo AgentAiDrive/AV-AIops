@@ -31,7 +31,7 @@ from core.ui.page_tips import show as show_tip
 from core.utils.slash_commands import SlashCommand 
 from core.utils.slash_commands import parse_slash_command
 from core.utils.slash_commands import SlashCommandError
-rom core.utils.slash_commands import usage_hint
+from core.utils.slash_commands import usage_hint
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
 
