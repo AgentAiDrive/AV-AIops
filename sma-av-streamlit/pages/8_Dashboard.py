@@ -1,4 +1,16 @@
-# sma-av-streamlit/pages/8_Dashboard.py
+"""
+pages/8_Dashboard.py
+---------------------
+
+An enhanced dashboard for AV AI Ops that provides a live view of workflow
+runs along with interactive controls for filtering, pagination, step/artefact
+exploration and a quick summary of current workflows.  The page makes
+minimal assumptions about the underlying run log store by delegating to a
+factory (`make_runstore`) that returns a compatible interface.  It falls
+back gracefully when optional dependencies (e.g. streamlit_autorefresh)
+aren't installed.
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,19 +21,24 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-# Import the shared RunStore helper
 from core.runstore_factory import make_runstore
 from core.db.session import get_session
-from core.workflow.service import list_workflows
+from core.workflow.service import list_workflows, compute_status
 
+
+# ---------------------------------------------------------------------------
+# Page configuration
+# ---------------------------------------------------------------------------
 st.set_page_config(page_title="Dashboard", layout="wide")
 st.title("📊 Dashboard")
 st.caption("AV AI OPS — Live view of workflow runs, steps, artifacts, and KPIs.")
 
+
 # ---------------------------------------------------------------------------
-# Shared RunStore
+# Instantiate the run store via factory
 # ---------------------------------------------------------------------------
 store = make_runstore()
+
 
 # ---------------------------------------------------------------------------
 # Sidebar controls
@@ -35,11 +52,14 @@ with st.sidebar:
     st.caption("Tip: If nothing appears, run a Workflow or /sop from Chat.")
 
 if auto:
+    # Attempt to use streamlit_autorefresh if installed
     try:
         from streamlit_autorefresh import st_autorefresh
+
         st_autorefresh(interval=5000, key="dash_refresh")
     except Exception:
         st.info("Install `streamlit-autorefresh` for auto refresh, or click refresh.")
+
 
 # ---------------------------------------------------------------------------
 # Time window → since
@@ -52,6 +72,7 @@ elif win == "7d":
     since = now - timedelta(days=7)
 elif win == "30d":
     since = now - timedelta(days=30)
+
 
 # ---------------------------------------------------------------------------
 # Helpers for heterogeneous stores
@@ -86,9 +107,11 @@ def _stats_compat(store, *, hours: Optional[int] = None, since: Optional[datetim
 
 def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Optional[datetime]) -> List[Dict[str, Any]]:
     """Fetch runs from the store using whatever API it supports."""
+    # Try the current RunStore API first
     try:
         rows = store.latest_runs(limit=limit, status=statuses)
     except Exception:
+        # Fallback to alternative methods for other store implementations
         try:
             hours = None
             if since:
@@ -120,7 +143,6 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
                 or r.get("ts")
                 or r.get("time")
             ) or datetime.min.replace(tzinfo=timezone.utc)
-            # Ensure both sides are tz-aware
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if ts >= since:
@@ -129,7 +151,7 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
 
     # Filter by status if the store didn't handle it
     def _status_of(rr: Dict[str, Any]) -> str:
-        if "status" in rr and rr["status"]:
+        if rr.get("status"):
             return str(rr["status"])
         if rr.get("running"):
             return "running"
@@ -207,8 +229,9 @@ def _run_details_compat(store, run_id: Any) -> Dict[str, Any]:
     except Exception:
         return {"id": run_id, "steps": [], "artifacts": []}
 
+
 # ---------------------------------------------------------------------------
-# KPIs
+# KPI section
 # ---------------------------------------------------------------------------
 hours_for_stats = None
 if since:
@@ -226,15 +249,15 @@ if p95_ms is None:
     p95_ms = (float(p95_s) * 1000.0) if p95_s is not None else 0.0
 last_error = stats.get("last_error") or ""
 
-# Display KPI metrics
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Runs", f"{runs_total}")
 c2.metric("Success rate", f"{success_rate:.1f}%")
 c3.metric("p95 duration", f"{p95_ms:.0f} ms")
 c4.metric("Last error", last_error or "—")
 
+
 # ---------------------------------------------------------------------------
-# Recent runs table
+# Recent runs table with pagination
 # ---------------------------------------------------------------------------
 rows_raw = _latest_runs_compat(store, limit=200, statuses=statuses, since=since)
 rows = [_normalize_run(r) for r in rows_raw]
@@ -299,6 +322,7 @@ st.data_editor(
     },
 )
 
+
 # ---------------------------------------------------------------------------
 # Trend chart
 # ---------------------------------------------------------------------------
@@ -310,6 +334,7 @@ trend = (
     .rename(columns={"id": "runs"})
 )
 st.line_chart(trend.set_index("started_at"))
+
 
 # ---------------------------------------------------------------------------
 # Run details explorer
@@ -332,7 +357,7 @@ detail = _run_details_compat(store, selected_id_int)
 left, right = st.columns([2, 1], vertical_alignment="top")
 
 with left:
-    selected_row = next((r for r in rows if r["id"] == selected_id), None)
+    selected_row = next((r for r in rows if r["id"] == selected_id_int), None)
     title = (selected_row or {}).get("name") or detail.get("name") or "Run"
     agent_id = (selected_row or {}).get("agent_id") or detail.get("agent_id")
     recipe_id = (selected_row or {}).get("recipe_id") or detail.get("recipe_id")
@@ -340,7 +365,9 @@ with left:
     duration_ms = (selected_row or {}).get("duration_ms") or detail.get("duration_ms") or 0
 
     st.markdown(f"""**{title}** &nbsp;•&nbsp; #{selected_id_int}""")
-    st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
+    st.caption(
+        f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms"
+    )
 
     detail_url = f"/Run_Detail?run_id={selected_id_int}"
     st.link_button("🔎 Open full run details", detail_url, type="secondary")
@@ -420,6 +447,7 @@ with right:
                 if a.get("data"):
                     st.json(a["data"])
 
+
 # ---------------------------------------------------------------------------
 # Workflows panel (for reference)
 # ---------------------------------------------------------------------------
@@ -429,7 +457,6 @@ with get_session() as db:
     if not wfs:
         st.info("No workflows defined yet.")
     for wf in wfs:
-        from core.workflow.service import compute_status
         status = compute_status(wf)
         dot = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(status, "⚪")
         st.markdown(
@@ -437,5 +464,3 @@ with get_session() as db:
             f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
             unsafe_allow_html=True,
         )
-
-
