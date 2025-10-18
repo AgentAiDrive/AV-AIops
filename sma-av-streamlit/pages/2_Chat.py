@@ -1,15 +1,3 @@
-"""
-Chat page for the Streamlit AV operations assistant.
-
-This script defines the chat interface along with helpers for handling
-slash commands that convert a standard operating procedure (SOP) into
-a recipe, attach it to an agent, and execute it.  It also exposes
-functions for creating new recipes, attaching existing recipes to agents,
-and running a recipe via a slash command.  Secrets are resolved from
-the active provider and stored in the environment to be consumed by
-`core.llm.client`.
-"""
-
 import os
 import re
 import textwrap
@@ -27,10 +15,10 @@ from core.recipes.from_sop import sop_to_recipe_yaml
 from core.recipes.service import save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
 from core.ui.page_tips import show as show_tip
-# Consolidated import from slash_commands to avoid truncation errors
-from core.utils.slash_commands import SlashCommand
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
+# Consolidated import from slash_commands to avoid truncation errors
+from core.utils.slash_commands import SlashCommand, SlashCommandError, parse_slash_command, usage_hint
 
 # -----------------------------------------------------------------------------
 # Page setup
