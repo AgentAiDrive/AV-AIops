@@ -12,8 +12,14 @@ def run_workflow_phases(recipe: Dict[str, Any]) -> Iterator[tuple[str, str]]:
         yield phase, f"{phase} steps: {len(steps)}"
 
 def execute_recipe_run(db: Session, agent_id: int, recipe_id: int) -> Run:
-    agent = db.query(Agent).filter(Agent.id==agent_id).first()
-    recipe = db.query(Recipe).filter(Recipe.id==recipe_id).first()
+    agent = db.get(Agent, agent_id)
+    if agent is None:
+        raise ValueError(f"Agent {agent_id} not found")
+
+    recipe = db.get(Recipe, recipe_id)
+    if recipe is None:
+        raise ValueError(f"Recipe {recipe_id} not found")
+
     run = Run(agent_id=agent_id, recipe_id=recipe_id, status="running")
     db.add(run); db.commit(); db.refresh(run)
     recipe_dict = load_recipe_dict(recipe.yaml_path)
