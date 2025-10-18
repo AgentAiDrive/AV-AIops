@@ -1,4 +1,6 @@
-# pages/7_🧩_Workflows.py
+# sma-av-streamlit/pages/7_🧩_Workflows.py
+from __future__ import annotations
+
 import streamlit as st
 from core.db.session import get_session
 from core.db.seed import init_db
@@ -7,11 +9,9 @@ from core.workflow.service import (
     list_workflows, create_workflow, update_workflow, delete_workflow,
     run_now, compute_status, tick
 )
-# paste this at the top of any page
-import streamlit as st
 from core.ui.page_tips import show as show_tip
 
-PAGE_KEY = "Workflows"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+PAGE_KEY = "Workflows"
 show_tip(PAGE_KEY)
 
 st.title("🧩 Workflows")
@@ -122,7 +122,9 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
                         try:
                             with st.spinner("Executing workflow..."):
                                 run = run_now(db, wf.id)
-                            st.toast(f"Run {run.id} completed.", icon="✅")
+                            # Show returned id when available
+                            rid = getattr(run, "id", None) if run else None
+                            st.toast(f"Run {rid or '—'} completed.", icon="✅")
                         except Exception as e:
                             st.error(f"Run failed: {type(e).__name__}: {e}")
 
@@ -159,66 +161,3 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
                         st.rerun()
 
                 cols[4].write(f"Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'} · Status: {status}")
-
-                with st.expander("Configuration", expanded=False):
-                    with st.form(f"cfg-{wf.id}"):
-                        agent_choice = st.selectbox(
-                            "Agent",
-                            options=list(agent_opts.keys()),
-                            format_func=lambda i: agent_opts[i],
-                            index=list(agent_opts.keys()).index(wf.agent_id) if wf.agent_id in agent_opts else 0,
-                            key=f"agent-{wf.id}"
-                        ) if agent_opts else None
-
-                        recipe_choice = st.selectbox(
-                            "Recipe",
-                            options=list(recipe_opts.keys()),
-                            format_func=lambda i: recipe_opts[i],
-                            index=list(recipe_opts.keys()).index(wf.recipe_id) if wf.recipe_id in recipe_opts else 0,
-                            key=f"recipe-{wf.id}"
-                        ) if recipe_opts else None
-
-                        trig_choice = st.selectbox(
-                            "Trigger",
-                            ["manual", "interval"],
-                            index=0 if wf.trigger_type == "manual" else 1,
-                            key=f"trig-{wf.id}"
-                        )
-                        interval_val = None
-                        if trig_choice == "interval":
-                            interval_val = st.number_input(
-                                "Interval minutes",
-                                min_value=1,
-                                value=int(wf.trigger_value or 60),
-                                key=f"interval-{wf.id}"
-                            )
-
-                        submitted = st.form_submit_button("Update workflow")
-
-                    if submitted:
-                        updates = {}
-                        if agent_choice is not None and agent_choice != wf.agent_id:
-                            updates["agent_id"] = int(agent_choice)
-                        if recipe_choice is not None and recipe_choice != wf.recipe_id:
-                            updates["recipe_id"] = int(recipe_choice)
-                        if trig_choice != wf.trigger_type:
-                            updates["trigger_type"] = trig_choice
-                        if trig_choice == "interval":
-                            updates["trigger_value"] = int(interval_val or wf.trigger_value or 60)
-                        else:
-                            updates["trigger_value"] = None
-
-                        if not updates:
-                            st.info("No changes detected.")
-                        else:
-                            try:
-                                update_workflow(db, wf.id, **updates)
-                                st.success("Workflow updated.")
-                                st.rerun()
-                            except ValueError as e:
-                                st.error(str(e))
-                            except Exception as e:
-                                st.error(f"Update failed: {type(e).__name__}: {e}")
-
-# Optional: link to a dashboard page if you have one
-# st.page_link("pages/07_Dashboard.py", label="📊 Open Dashboard")
