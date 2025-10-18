@@ -27,11 +27,7 @@ from core.recipes.from_sop import sop_to_recipe_yaml
 from core.recipes.service import save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
 from core.ui.page_tips import show as show_tip
-from core.utils.slash_commands import (
-    SlashCommand,
-    SlashCommandError,
-    parse_slash_command,
-    usage_hint,
+from core.utils.slash_commands import SlashCommand, SlashCommandError, parse_slash_command, usage_hint,
 )
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
