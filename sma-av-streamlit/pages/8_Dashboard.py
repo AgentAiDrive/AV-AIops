@@ -5,7 +5,6 @@ import json
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -58,12 +57,14 @@ elif win == "30d":
 # Helpers for heterogeneous stores
 # ---------------------------------------------------------------------------
 def _to_dt(value: Any) -> Optional[datetime]:
+    """Parse a variety of datetime representations into a tz-aware UTC datetime."""
     if not value:
         return None
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except Exception:
         return None
 
@@ -93,7 +94,7 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
         try:
             hours = None
             if since:
-                hours = max(1, int((now - since).total_seconds() // 3600))
+                hours = max(1, int((datetime.now(timezone.utc) - since).total_seconds() // 3600))
             rows = store.recent(limit=limit, hours=hours or 24)
         except Exception:
             # Try list_runs()
@@ -101,8 +102,9 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
                 rows = store.list_runs()
             except Exception:
                 rows = []
+
     # Parse JSON strings if necessary
-    out = []
+    out: List[Dict[str, Any]] = []
     for r in rows:
         if isinstance(r, str):
             try:
@@ -111,27 +113,33 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
                 continue
         out.append(r)
 
-    # Time-window filter using parsed timestamps
+    # Time-window filter using parsed timestamps (always tz-aware)
     if since:
-        def _ts_row(rr: Dict[str, Any]) -> Optional[datetime]:
-            return _to_dt(
-                rr.get("started_at")
-                or rr.get("start")
-                or rr.get("created_at")
-                or rr.get("ts")
-                or rr.get("time")
-            )
-        out = [r for r in out if (_ts_row(r) or datetime.min.replace(tzinfo=timezone.utc)) >= since]
+        filtered: List[Dict[str, Any]] = []
+        for r in out:
+            ts = _to_dt(
+                r.get("started_at")
+                or r.get("start")
+                or r.get("created_at")
+                or r.get("ts")
+                or r.get("time")
+            ) or datetime.min.replace(tzinfo=timezone.utc)
+            # Ensure tz-aware
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts >= since:
+                filtered.append(r)
+        out = filtered
 
     # Status mapping if store didn't filter
-    def _status_of(r: Dict[str, Any]) -> str:
-        if "status" in r and r["status"]:
-            return str(r["status"])
-        if r.get("running"):
+    def _status_of(rr: Dict[str, Any]) -> str:
+        if "status" in rr and rr["status"]:
+            return str(rr["status"])
+        if rr.get("running"):
             return "running"
-        if r.get("ok") is True:
+        if rr.get("ok") is True:
             return "success"
-        if r.get("ok") is False:
+        if rr.get("ok") is False:
             return "failed"
         return "unknown"
 
@@ -207,7 +215,7 @@ def _run_details_compat(store, run_id: Any) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 hours_for_stats = None
 if since:
-    hours_for_stats = max(1, int((now - since).total_seconds() // 3600))
+    hours_for_stats = max(1, int((datetime.now(timezone.utc) - since).total_seconds() // 3600))
 
 stats = _stats_compat(store, hours=hours_for_stats, since=since)
 runs_total = stats.get("runs") or stats.get("count") or 0
@@ -232,6 +240,9 @@ c4.metric("Last error", last_error or "—")
 # ---------------------------------------------------------------------------
 rows_raw = _latest_runs_compat(store, limit=200, statuses=statuses, since=since)
 rows = [_normalize_run(r) for r in rows_raw]
+
+# Drop rows that still lack a timestamp; avoids pandas sorting errors
+rows = [r for r in rows if r["started_at"] is not None]
 
 if not rows:
     st.info("No runs in this window. Trigger a workflow from **🧩 Workflows** or use **/sop** in **💬 Chat**.")
