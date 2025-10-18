@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..db.models import WorkflowDef
 from .engine import execute_recipe_run
 
-# NEW: shared RunStore helpers
+# Import the shared run-store helper
 from core.runstore_factory import make_runstore, record_run_start, record_run_finish
 
 
@@ -105,14 +105,18 @@ def compute_status(wf: WorkflowDef) -> str:
 
 
 def run_now(db: Session, wf_id: int):
+    """
+    Trigger a workflow immediately.  Records the run in RunStore with
+    'running' at start and then 'success' or 'failed' at finish.
+    """
     wf = db.query(WorkflowDef).filter(WorkflowDef.id == wf_id).first()
     if not wf:
         return None
 
-    # --- Start: write "running" record to RunStore
+    # Write a 'running' record to RunStore
     store = make_runstore()
     started_dt = datetime.now(timezone.utc)
-    # Use a generated id; if engine returns an id we’ll adopt it later
+    # Use a generated UUID as the run id; adopt the engine's id if it exists
     run_id = f"{uuid4()}"
     record_run_start(
         store,
@@ -124,13 +128,12 @@ def run_now(db: Session, wf_id: int):
         started_at=started_dt,
     )
 
-    # --- Execute the recipe
     err_msg = None
     status = "success"
     run = None
     try:
         run = execute_recipe_run(db, agent_id=wf.agent_id, recipe_id=wf.recipe_id)
-        # Try to pick up an engine-provided id, if available
+        # If the engine returns an id, use it instead
         engine_id = (
             getattr(run, "id", None)
             or getattr(run, "run_id", None)
@@ -142,7 +145,7 @@ def run_now(db: Session, wf_id: int):
     except Exception as e:
         status = "failed"
         err_msg = f"{type(e).__name__}: {e}"
-        # Finish record before re-raising so dashboard shows the failure
+        # Record failure before re-raising to make the dashboard reflect the failure
         record_run_finish(
             store,
             run_id=run_id,
@@ -152,7 +155,7 @@ def run_now(db: Session, wf_id: int):
         )
         raise
     finally:
-        # Mark finish if success path
+        # Record success if no error occurred
         if err_msg is None:
             record_run_finish(
                 store,
@@ -162,7 +165,7 @@ def run_now(db: Session, wf_id: int):
                 started_at=started_dt,
             )
 
-    # --- Update workflow book-keeping
+    # Update workflow timestamps/status
     wf.last_run_at = datetime.utcnow()
     wf.status = compute_status(wf)
     if wf.trigger_type == "interval" and wf.trigger_value:
@@ -173,6 +176,7 @@ def run_now(db: Session, wf_id: int):
 
 
 def tick(db: Session) -> int:
+    """Run all due interval workflows.  Returns number of workflows run."""
     now = datetime.utcnow()
     due = (
         db.query(WorkflowDef)
