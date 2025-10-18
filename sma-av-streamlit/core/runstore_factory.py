@@ -8,16 +8,18 @@ from core.runs_store import RunStore
 
 
 def make_runstore() -> RunStore:
-    """Create RunStore pointing to the same DB everywhere."""
+    """Return a RunStore instance pointing to the same DB everywhere."""
     db_path = Path(__file__).resolve().parents[1] / "avops.db"
     try:
-        return RunStore(db_path=db_path)  # newer signature
+        # Newer RunStore classes accept a path
+        return RunStore(db_path=db_path)
     except TypeError:
-        return RunStore()  # older signature (no-arg)
+        # Fallback: older RunStore with no arguments
+        return RunStore()
 
 
 def _call_first(obj: Any, candidates: list[str], *args, **kwargs):
-    """Call the first method that exists on obj; no-op if none exist."""
+    """Call the first existing method on the object from the candidate list."""
     for name in candidates:
         fn = getattr(obj, name, None)
         if callable(fn):
@@ -35,6 +37,7 @@ def record_run_start(
     trigger: str,
     started_at: Optional[datetime] = None,
 ) -> None:
+    """Write an entry indicating a workflow run has started."""
     started_at = started_at or datetime.now(timezone.utc)
     row: Dict[str, Any] = {
         "id": run_id,
@@ -46,6 +49,7 @@ def record_run_start(
         "status": "running",
         "ok": None,
     }
+    # Prefer append; fall back to other common insertion methods
     _call_first(store, ["append", "add", "insert", "write", "put", "upsert"], row)
 
 
@@ -59,6 +63,7 @@ def record_run_finish(
     finished_at: Optional[datetime] = None,
     duration_ms: Optional[float] = None,
 ) -> None:
+    """Update the run entry when it completes."""
     finished_at = finished_at or datetime.now(timezone.utc)
     payload: Dict[str, Any] = {
         "id": run_id,
@@ -66,12 +71,12 @@ def record_run_finish(
         "status": status,
         "ok": (status == "success"),
     }
+    # If duration isn't provided, derive from start/end
     if duration_ms is None and started_at:
         duration_ms = (finished_at - started_at).total_seconds() * 1000.0
     if duration_ms is not None:
         payload["duration_ms"] = duration_ms
     if error:
         payload["error"] = error
-
-    # Prefer update; fall back to a write/upsert variant
+    # Prefer update; fall back to other common update methods
     _call_first(store, ["update", "upsert", "append", "write", "put"], payload)
