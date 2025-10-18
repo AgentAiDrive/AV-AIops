@@ -19,6 +19,18 @@ from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
 # Consolidated import from slash_commands to avoid truncation errors
 from core.utils.slash_commands import SlashCommand, SlashCommandError, usage_hint
+# core/utils/slash_commands.py  (add at bottom of file)
+
+# Back-compat: older code may import _usage_hint
+_usage_hint = usage_hint
+
+__all__ = [
+    "SlashCommand",
+    "SlashCommandError",
+    "parse_slash_command",
+    "usage_hint",
+    "_usage_hint",  # temporary back-compat
+]
 
 # -----------------------------------------------------------------------------
 # Page setup
