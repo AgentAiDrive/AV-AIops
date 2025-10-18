@@ -29,9 +29,6 @@ from core.recipes.validator import validate_yaml_text
 from core.ui.page_tips import show as show_tip
 # Consolidated import from slash_commands to avoid truncation errors
 from core.utils.slash_commands import SlashCommand 
-from core.utils.slash_commands import parse_slash_command
-from core.utils.slash_commands import SlashCommandError
-from core.utils.slash_commands import usage_hint
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
 
