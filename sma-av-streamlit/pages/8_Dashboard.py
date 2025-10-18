@@ -339,11 +339,11 @@ with left:
     status = (selected_row or {}).get("status") or detail.get("status")
     duration_ms = (selected_row or {}).get("duration_ms") or detail.get("duration_ms") or 0
 
-    st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id_int}")
+    st.markdown(f"""**{title}** &nbsp;•&nbsp; #{selected_id_int}""")
     st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
 
     # Use direct URL (page_link doesn’t support page_args)
-    detail_url = f"/Run_Detail?run_id={selected_id_int}"
+    detail_url = f"""/Run_Detail?run_id={selected_id_int}"""
     st.page_link(detail_url, label="Open full run details", icon="🔎")
 
     # Steps
@@ -438,3 +438,4 @@ with get_session() as db:
             f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
             unsafe_allow_html=True,
         )
+
