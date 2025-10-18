@@ -18,7 +18,7 @@ from core.ui.page_tips import show as show_tip
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
 # Consolidated import from slash_commands to avoid truncation errors
-from core.utils.slash_commands import SlashCommand, SlashCommandError, _usage_hint
+from core.utils.slash_commands import SlashCommand, SlashCommandError, usage_hint
 
 # -----------------------------------------------------------------------------
 # Page setup
