@@ -1,0 +1,30 @@
+{
+  "name": "calendar_scheduler",
+  "description": "Manage conference room and technician schedules via a RESTful MCP endpoint.",
+  "endpoints": [
+    "/health",
+    "/events",
+    "/events/{event_id}",
+    "/events/{event_id}/cancel"
+  ],
+  "actions": {
+    "create_event": {
+      "description": "Create a meeting with participants, room, and start/end times.",
+      "parameters": {
+        "title": "string",
+        "room": "string",
+        "start": "datetime",
+        "end": "datetime",
+        "participants": "list[string]"
+      }
+    },
+    "reschedule_event": {
+      "description": "Move an existing meeting to a new slot.",
+      "parameters": {
+        "event_id": "string",
+        "start": "datetime",
+        "end": "datetime"
+      }
+    }
+  }
+}

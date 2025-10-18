@@ -1,0 +1,25 @@
+{
+  "name": "qsys_control",
+  "description": "Control Q-SYS Core processors for audio/video routing and device status.",
+  "endpoints": [
+    "/health",
+    "/devices",
+    "/devices/{device_id}/command"
+  ],
+  "actions": {
+    "set_gain": {
+      "description": "Adjust output gain on a Q-SYS channel.",
+      "parameters": {
+        "device_id": "string",
+        "channel": "string",
+        "db": "number"
+      }
+    },
+    "recall_snapshot": {
+      "description": "Recall a named design snapshot.",
+      "parameters": {
+        "snapshot": "string"
+      }
+    }
+  }
+}

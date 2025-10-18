@@ -1,0 +1,28 @@
+{
+  "name": "incident_ticketing",
+  "description": "Create and update incidents across ServiceNow, Zendesk, or Jira Service Management.",
+  "endpoints": [
+    "/health",
+    "/tickets",
+    "/tickets/{ticket_id}",
+    "/tickets/{ticket_id}/comment"
+  ],
+  "actions": {
+    "create_ticket": {
+      "description": "Open a new incident with priority and impact.",
+      "parameters": {
+        "title": "string",
+        "description": "string",
+        "priority": "string",
+        "service": "string"
+      }
+    },
+    "update_state": {
+      "description": "Transition a ticket to a new state (e.g., in_progress, resolved).",
+      "parameters": {
+        "ticket_id": "string",
+        "state": "string"
+      }
+    }
+  }
+}

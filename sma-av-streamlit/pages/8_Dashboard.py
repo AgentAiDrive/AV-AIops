@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,6 +41,7 @@ with st.sidebar:
     st.header("Filters")
     win = st.selectbox("Time window", ["24h", "7d", "30d", "All"], index=0)
     statuses = st.multiselect("Status", ["running", "success", "failed"], default=["running", "success", "failed"])
+    page_size = st.slider("Runs per page", min_value=5, max_value=50, value=10, step=5)
     auto = st.toggle("Auto-refresh (5s)", value=False)
     st.caption("Tip: If nothing appears, run a Workflow or /sop from Chat.")
 
@@ -231,7 +233,7 @@ if not rows:
     st.info("No runs in this window. Trigger a workflow from **🧩 Workflows** or use **/sop** in **💬 Chat**.")
     st.stop()
 
-df = pd.DataFrame([
+records = [
     {
         "id": r["id"],
         "name": r["name"],
@@ -243,18 +245,53 @@ df = pd.DataFrame([
         "started_at": r["started_at"],
     }
     for r in rows
-])
-df.sort_values("started_at", ascending=False, inplace=True)
+]
+
+df_all = pd.DataFrame(records)
+df_all.sort_values("started_at", ascending=False, inplace=True)
+
+total_runs = len(df_all)
+total_pages = max(1, math.ceil(total_runs / page_size))
+if "runs_page" not in st.session_state:
+    st.session_state["runs_page"] = 1
+if st.session_state["runs_page"] > total_pages:
+    st.session_state["runs_page"] = total_pages
+
+page = int(
+    st.number_input(
+        "Page",
+        min_value=1,
+        max_value=total_pages,
+        value=st.session_state["runs_page"],
+        step=1,
+        key="runs_page_widget",
+    )
+)
+st.session_state["runs_page"] = page
+
+start_idx = (page - 1) * page_size
+end_idx = min(start_idx + page_size, total_runs)
+df_page = df_all.iloc[start_idx:end_idx].copy()
+df_page["Details"] = df_page["id"].apply(lambda rid: f"/Run_Detail?run_id={rid}")
 
 st.subheader("Recent Runs")
-st.dataframe(df, use_container_width=True, hide_index=True)
+st.caption(f"Showing runs {start_idx + 1}-{end_idx} of {total_runs}.")
+st.data_editor(
+    df_page,
+    use_container_width=True,
+    hide_index=True,
+    disabled=True,
+    column_config={
+        "Details": st.column_config.LinkColumn("Details", display_text="Open"),
+    },
+)
 
 # ---------------------------------------------------------------------------
 # Trend chart
 # ---------------------------------------------------------------------------
 st.subheader("Run Trend")
 trend = (
-    df.groupby(df["started_at"].dt.floor("H"))["id"]
+    df_all.groupby(df_all["started_at"].dt.floor("H"))["id"]
     .count()
     .reset_index()
     .rename(columns={"id": "runs"})
@@ -265,8 +302,18 @@ st.line_chart(trend.set_index("started_at"))
 # Run details explorer
 # ---------------------------------------------------------------------------
 st.subheader("Run Details")
-selected_id = st.selectbox("Select a run ID", options=df["id"].tolist())
-detail = _run_details_compat(store, selected_id)
+selected_id = st.selectbox("Select a run ID", options=df_all["id"].tolist(), index=0)
+try:
+    selected_id_int = int(selected_id)
+except (TypeError, ValueError):
+    selected_id_int = selected_id
+
+if st.session_state.get("current_detail_id") != selected_id_int:
+    st.session_state["current_detail_id"] = selected_id_int
+    st.session_state[f"steps_page_{selected_id_int}"] = 1
+    st.session_state[f"artifacts_page_{selected_id_int}"] = 1
+
+detail = _run_details_compat(store, selected_id_int)
 
 left, right = st.columns([2, 1], vertical_alignment="top")
 
@@ -279,34 +326,82 @@ with left:
     status = (selected_row or {}).get("status") or detail.get("status")
     duration_ms = (selected_row or {}).get("duration_ms") or detail.get("duration_ms") or 0
 
-    st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id}")
+    st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id_int}")
     st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
+    st.page_link(
+        "pages/8_Run_Detail.py",
+        label="Open full run details",
+        page_args={"run_id": selected_id_int},
+        icon="🔎",
+    )
 
     # Steps
     st.markdown("**Steps**")
     steps = detail.get("steps", [])
-    for s in steps:
-        level = s.get("level") or "info"
-        phase = s.get("phase") or "—"
-        msg = s.get("message") or s.get("msg") or "—"
-        status = s.get("status") or "—"
-        ts = s.get("ts") or s.get("time") or "—"
-        with st.expander(f"[{phase}] {msg}  —  {status} · {ts}", expanded=False):
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**Payload**")
-                st.json(s.get("payload") or {})
-            with c2:
-                st.markdown("**Result**")
-                st.json(s.get("result") or {})
+    if not steps:
+        st.caption("No step events recorded yet.")
+    else:
+        step_page_size = 5
+        step_total = len(steps)
+        step_pages = max(1, math.ceil(step_total / step_page_size))
+        step_state_key = f"steps_page_{selected_id_int}"
+        current_step_page = min(st.session_state.get(step_state_key, 1), step_pages)
+        current_step_page = int(
+            st.number_input(
+                "Step page",
+                min_value=1,
+                max_value=step_pages,
+                value=current_step_page,
+                step=1,
+                key=f"{step_state_key}_widget",
+            )
+        )
+        st.session_state[step_state_key] = current_step_page
+        step_start = (current_step_page - 1) * step_page_size
+        step_end = min(step_start + step_page_size, step_total)
+        st.caption(f"Showing steps {step_start + 1}-{step_end} of {step_total}.")
+        for s in steps[step_start:step_end]:
+            level = s.get("level") or "info"
+            phase = s.get("phase") or "—"
+            msg = s.get("message") or s.get("msg") or "—"
+            status = s.get("status") or "—"
+            ts = s.get("ts") or s.get("time") or "—"
+            with st.expander(f"[{phase}] {msg}  —  {status} · {ts}", expanded=False):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("**Payload**")
+                    st.json(s.get("payload") or {})
+                with c2:
+                    st.markdown("**Result**")
+                    st.json(s.get("result") or {})
 
 with right:
     st.markdown("**Artifacts**")
     arts = detail.get("artifacts", [])
     if not arts:
+        st.caption("No artifacts captured.")
         st.write("—")
     else:
-        for a in arts:
+        art_page_size = 4
+        art_total = len(arts)
+        art_pages = max(1, math.ceil(art_total / art_page_size))
+        art_state_key = f"artifacts_page_{selected_id_int}"
+        current_art_page = min(st.session_state.get(art_state_key, 1), art_pages)
+        current_art_page = int(
+            st.number_input(
+                "Artifact page",
+                min_value=1,
+                max_value=art_pages,
+                value=current_art_page,
+                step=1,
+                key=f"{art_state_key}_widget",
+            )
+        )
+        st.session_state[art_state_key] = current_art_page
+        art_start = (current_art_page - 1) * art_page_size
+        art_end = min(art_start + art_page_size, art_total)
+        st.caption(f"Showing artifacts {art_start + 1}-{art_end} of {art_total}.")
+        for a in arts[art_start:art_end]:
             with st.container(border=True):
                 st.write(f"**{a.get('kind','artifact')}** — {a.get('title','')}")
                 if a.get("url"):

@@ -1,0 +1,26 @@
+{
+  "name": "extron_control",
+  "description": "Control Extron switchers and processors via MCP.",
+  "endpoints": [
+    "/health",
+    "/devices",
+    "/devices/{device_id}/macro"
+  ],
+  "actions": {
+    "set_input": {
+      "description": "Select an input on an Extron switcher.",
+      "parameters": {
+        "device_id": "string",
+        "input": "integer",
+        "output": "integer"
+      }
+    },
+    "trigger_macro": {
+      "description": "Run a stored macro (lighting, display on/off, etc.).",
+      "parameters": {
+        "device_id": "string",
+        "macro": "string"
+      }
+    }
+  }
+}

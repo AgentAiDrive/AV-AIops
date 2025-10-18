@@ -205,6 +205,30 @@ class RunStore:
             last_err = next((r.error for r in sorted(rows, key=lambda x: x.id, reverse=True) if r.error), "")
             return {"runs": n, "success_rate": (succ / n) * 100.0 if n else 0.0, "p95_ms": p95, "last_error": last_err or ""}
 
+    def recipe_metrics(self, recipe_id: int, *, limit: int = 200) -> Dict[str, Any]:
+        """Return recent success metrics for a specific recipe."""
+        with self.Session() as s:
+            rows = (
+                s.execute(
+                    select(WorkflowRun)
+                    .where(WorkflowRun.recipe_id == recipe_id)
+                    .order_by(WorkflowRun.id.desc())
+                    .limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+            total = len(rows)
+            success = sum(1 for r in rows if r.status == "success")
+            last_status = rows[0].status if rows else "unknown"
+            avg_ms = sum(r.duration_ms or 0.0 for r in rows) / total if total else 0.0
+            return {
+                "runs": total,
+                "success_rate": (success / total) * 100.0 if total else 0.0,
+                "last_status": last_status,
+                "avg_ms": avg_ms,
+            }
+
     # ---- Dict helpers -------------------------------------------------------
     @staticmethod
     def _run_to_dict(r: WorkflowRun) -> Dict[str, Any]:

@@ -8,6 +8,16 @@ from core.workflow.engine import execute_recipe_run
 
 st.title("🤖 Agents")
 
+st.markdown(
+    """
+    <style>
+    .agent-scroll {max-height: 480px; overflow-y: auto; scroll-behavior: smooth; padding-right: 0.5rem;}
+    .agent-card {margin-bottom: 1rem;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 def _clean(s: str | None) -> str:
     return " ".join((s or "").strip().split())
 
@@ -51,8 +61,9 @@ with get_session() as db:  # type: ignore
                 st.info(f"Agent **{existing.name}** already exists (id={existing.id}).")
             else:
                 try:
-                    db.add(Agent(name=name, domain=domain, config_json={}))
-                    db.commit()
+                    with st.spinner("Creating agent..."):
+                        db.add(Agent(name=name, domain=domain, config_json={}))
+                        db.commit()
                     st.success(f"Agent **{name}** created.")
                 except IntegrityError as e:
                     db.rollback()
@@ -64,36 +75,64 @@ with get_session() as db:  # type: ignore
     st.divider()
     st.subheader("Agents")
 
-    agents = db.query(Agent).all()
-    recipes = db.query(Recipe).all()
+    agents = db.query(Agent).order_by(Agent.name).all()
+    recipes = db.query(Recipe).order_by(Recipe.name).all()
 
-    for a in agents:
-        with st.container(border=True):
-            st.markdown(f"**{a.name}** · `{a.domain}`")
-            cols = st.columns([2,2,2])
-            rec = cols[0].selectbox(
-                "Recipe", recipes, format_func=lambda r: r.name,
-                key=f"r-{a.id}"
-            ) if recipes else None
+    search_query = st.text_input("Filter agents", placeholder="Search by name or domain...")
+    recipe_filter = st.text_input("Filter recipes", placeholder="Filter recipe names for selection...")
 
-            if cols[1].button("Trigger Run", key=f"run-{a.id}"):
-                if not rec:
-                    st.warning("Choose a recipe first.")
-                else:
+    filtered_agents = agents
+    if search_query:
+        term = search_query.lower()
+        filtered_agents = [
+            a for a in agents if term in a.name.lower() or term in (a.domain or "").lower()
+        ]
+
+    filtered_recipes = recipes
+    if recipe_filter:
+        rterm = recipe_filter.lower()
+        filtered_recipes = [r for r in recipes if rterm in r.name.lower()]
+
+    if not filtered_agents:
+        st.info("No agents match your filter.")
+    else:
+        st.markdown("<div class='agent-scroll'>", unsafe_allow_html=True)
+        for a in filtered_agents:
+            with st.container(border=True):
+                st.markdown(f"<div class='agent-card'><strong>{a.name}</strong> · `{a.domain}`</div>", unsafe_allow_html=True)
+                cols = st.columns([2, 2, 2])
+                rec = (
+                    cols[0].selectbox(
+                        "Recipe",
+                        filtered_recipes,
+                        format_func=lambda r: r.name,
+                        key=f"r-{a.id}"
+                    )
+                    if filtered_recipes
+                    else None
+                )
+
+                if cols[1].button("Trigger Run", key=f"run-{a.id}"):
+                    if not rec:
+                        st.warning("Choose a recipe first.")
+                    else:
+                        try:
+                            with st.spinner("Executing run..."):
+                                run = execute_recipe_run(db, agent_id=a.id, recipe_id=rec.id)
+                            st.toast(f"Run {getattr(run, 'id', '—')} completed.", icon="✅")
+                        except Exception as e:
+                            st.error(f"Run failed: {type(e).__name__}: {e}")
+
+                if cols[2].button("Delete", key=f"del-{a.id}"):
                     try:
-                        run = execute_recipe_run(db, agent_id=a.id, recipe_id=rec.id)
-                        st.toast(f"Run {getattr(run, 'id', '—')} completed.", icon="✅")
+                        with st.spinner("Removing agent..."):
+                            db.delete(a)
+                            db.commit()
+                        st.rerun()
+                    except IntegrityError as e:
+                        db.rollback()
+                        st.error("Cannot delete this agent due to database constraints.")
                     except Exception as e:
-                        st.error(f"Run failed: {type(e).__name__}: {e}")
-
-            if cols[2].button("Delete", key=f"del-{a.id}"):
-                try:
-                    db.delete(a)
-                    db.commit()
-                    st.rerun()
-                except IntegrityError as e:
-                    db.rollback()
-                    st.error("Cannot delete this agent due to database constraints.")
-                except Exception as e:
-                    db.rollback()
-                    st.error(f"Delete failed: {type(e).__name__}: {e}")
+                        db.rollback()
+                        st.error(f"Delete failed: {type(e).__name__}: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)

@@ -1,15 +1,27 @@
 import os
 import re
-import streamlit as st
+import textwrap
+from typing import Optional
 
-from core.llm.client import chat  # your existing chat() function
-from core.recipes.from_sop import sop_to_recipe_yaml
-from core.recipes.attach import attach_recipe_to_agent
-from core.mcp.from_sop_tools import ensure_tools_for_sop
-from core.db.session import get_session
-from core.workflow.engine import execute_recipe_run
 import streamlit as st
+from sqlalchemy import func
+
+from core.db.models import Agent, Recipe
+from core.db.session import get_session
+from core.llm.client import chat  # your existing chat() function
+from core.mcp.from_sop_tools import ensure_tools_for_sop
+from core.recipes.attach import attach_recipe_to_agent
+from core.recipes.from_sop import sop_to_recipe_yaml
+from core.recipes.service import save_recipe_yaml
+from core.recipes.validator import validate_yaml_text
 from core.ui.page_tips import show as show_tip
+from core.utils.slash_commands import (
+    SlashCommand,
+    SlashCommandError,
+    parse_slash_command,
+    usage_hint,
+)
+from core.workflow.engine import execute_recipe_run
 
 PAGE_KEY = "Chat"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
 show_tip(PAGE_KEY)
@@ -22,30 +34,31 @@ st.title("💬 Chat")
 with st.sidebar:
     st.subheader("Task helpers")
     st.markdown("Use **/sop** to convert text → recipe → attach → run. Example:")
-    st.code("/sop Agent=Support Name=Projector Reset\nSteps:\n- Gather_room\n- Reset projector\n- Verify image via Slack")
+    st.code("/sop agent=Support name=\"Projector Reset\"\nSteps:\n- Gather_room\n- Reset projector\n- Verify image via Slack")
     json_mode = st.checkbox("JSON mode (raw tool payloads)", value=False)
     st.markdown(
         r"""
     **Slash commands (copy/paste)**
     ```text
-    /sop Agent=Support Name=Projector Reset
+    /sop agent=Support name="Projector Reset"
     Steps:
     - Gather room_id
     - Reset projector via Q-SYS
     - Verify image via Slack
-    
-    /recipe new Projector Reset
-    
-    /recipe attach agent=Support recipe="Projector Reset"
-    
-    /agent run Support recipe="Projector Reset"
-    
-    /tool health slack
-    
-    /tool action servicenow {"action":"create_kb","args":{"title":"Zoom HDMI Black","html":"<h2>Symptoms…</h2><p>HDMI input shows black screen…</p>"}}
-    
+
+    /recipe new "Projector Reset"
+
+    /recipe attach agent="Support" recipe="Projector Reset"
+
+    /agent run "Support" recipe="Projector Reset"
+
+    /tool health calendar_scheduler
+
+    /tool action incident_ticketing '{"action":"create","args":{"title":"Zoom HDMI Black","description":"HDMI input shows black screen"}}'
+
     /kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com)'''"""
     )
+    st.caption("Tip: Wrap multi-word names in quotes. Key/value pairs accept agent=, recipe=, etc.")
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
 provider_key, provider_name, key_source = get_active_key()  # ('openai'|'anthropic') and the key + source string
@@ -88,28 +101,185 @@ def _render_messages():
             else:
                 st.write(m["content"])
 
-# --- /sop pipeline -----------------------------------------------------------
-def _handle_sop(text: str):
-    agent = re.search(r"Agent=([^\n]+)", text)
-    name = re.search(r"Name=([^\n]+)", text)
-    agent_name = (agent.group(1).strip() if agent else "Support")
-    recipe_name = (name.group(1).strip() if name else "Generated Recipe")
+def _extract_option(cmd: SlashCommand, text: str, key: str, default: Optional[str] = None) -> str:
+    value = cmd.option(key)
+    if value:
+        return value
+    match = re.search(rf"{key}\s*=([^\n]+)", text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return default or ""
 
-    # Strip first line (with /sop and keyvals) if present; pass the body to SOP→Recipe
-    sop_body = text.split("\n", 1)[1] if "\n" in text else text
+
+def _handle_sop(cmd: SlashCommand):
+    agent_name = _extract_option(cmd, cmd.raw, "agent", "Support")
+    recipe_name = _extract_option(cmd, cmd.raw, "name", "Generated Recipe")
+
+    sop_body = cmd.body or (cmd.raw.split("\n", 1)[1] if "\n" in cmd.raw else cmd.raw)
 
     ok, yml = sop_to_recipe_yaml(sop_body, name_hint=recipe_name)
     if not ok:
         raise RuntimeError("Failed to generate recipe YAML from SOP.")
 
-    # Scaffold any missing MCP tool stubs implied by SOP text
     tools, created = ensure_tools_for_sop(os.getcwd(), sop_body)
 
-    # Attach recipe to agent and execute a run
     with get_session() as db:  # type: ignore
         a, r = attach_recipe_to_agent(db, agent_name, recipe_name, yml)
         run = execute_recipe_run(db, agent_id=a.id, recipe_id=r.id)
         return a.name, r.name, tools, created, yml, getattr(run, "id", None)
+
+
+def _slugify(name: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", name).strip("-")
+    return cleaned.lower() or "recipe"
+
+
+def _handle_recipe_new(cmd: SlashCommand) -> str:
+    name = cmd.option("name") or (cmd.args[0] if cmd.args else None)
+    if not name:
+        raise SlashCommandError(usage_hint("recipe", "new"))
+
+    yaml_filename = f"{_slugify(name)}.yaml"
+    guardrail_template = textwrap.dedent(
+        f"""\
+        name: {name}
+        description: Auto-generated from chat command
+        guardrails:
+          timeout_minutes: 30
+          rollback_actions:
+            - Notify incident commander
+        success_metrics:
+          - metric: resolution_time_seconds
+            target: 1800
+        intake: []
+        plan: []
+        act: []
+        verify: []
+        """
+    ).strip()
+
+    ok, msg = validate_yaml_text(guardrail_template)
+    if not ok:
+        raise SlashCommandError(msg)
+
+    save_recipe_yaml(yaml_filename, guardrail_template)
+
+    with get_session() as db:  # type: ignore
+        existing = db.query(Recipe).filter(func.lower(Recipe.name) == name.lower()).first()
+        if existing:
+            return f"Recipe **{existing.name}** already exists. Updated YAML file {yaml_filename}."
+        recipe = Recipe(name=name, yaml_path=yaml_filename)
+        db.add(recipe)
+        db.commit()
+    return f"Recipe **{name}** scaffolded with guardrails → `{yaml_filename}`. Review it under 📜 Recipes."
+
+
+def _handle_recipe_attach(cmd: SlashCommand) -> str:
+    agent_name = cmd.option("agent") or (cmd.args[0] if cmd.args else None)
+    recipe_name = cmd.option("recipe") or (cmd.args[1] if len(cmd.args) > 1 else None)
+    if not agent_name or not recipe_name:
+        raise SlashCommandError(usage_hint("recipe", "attach"))
+
+    with get_session() as db:  # type: ignore
+        agent = (
+            db.query(Agent)
+            .filter(func.lower(Agent.name) == agent_name.lower())
+            .first()
+        )
+        if not agent:
+            raise SlashCommandError(
+                f"Agent '{agent_name}' does not exist. Create it from the 🤖 Agents page first."
+            )
+
+        recipe = (
+            db.query(Recipe)
+            .filter(func.lower(Recipe.name) == recipe_name.lower())
+            .first()
+        )
+        if not recipe:
+            raise SlashCommandError(
+                f"Recipe '{recipe_name}' does not exist. Use /recipe new or the 📜 Recipes page to create it."
+            )
+
+    return (
+        f"Agent **{agent.name}** can now run recipe **{recipe.name}**. "
+        "Use `/agent run` or the Workflows page to execute it."
+    )
+
+
+def _handle_agent_run(cmd: SlashCommand) -> str:
+    agent_name = cmd.option("agent") or (cmd.args[0] if cmd.args else None)
+    recipe_name = cmd.option("recipe") or (cmd.args[1] if len(cmd.args) > 1 else None)
+    if not agent_name or not recipe_name:
+        raise SlashCommandError(usage_hint("agent", "run"))
+
+    with get_session() as db:  # type: ignore
+        agent = (
+            db.query(Agent)
+            .filter(func.lower(Agent.name) == agent_name.lower())
+            .first()
+        )
+        if not agent:
+            raise SlashCommandError(f"Agent '{agent_name}' was not found.")
+
+        recipe = (
+            db.query(Recipe)
+            .filter(func.lower(Recipe.name) == recipe_name.lower())
+            .first()
+        )
+        if not recipe:
+            raise SlashCommandError(f"Recipe '{recipe_name}' was not found.")
+
+        with st.spinner("Running workflow..."):
+            run = execute_recipe_run(db, agent_id=agent.id, recipe_id=recipe.id)
+    rid = getattr(run, "id", None)
+    if rid is None:
+        return f"Triggered run for **{agent.name}** using recipe **{recipe.name}**."
+    detail_url = f"/Run_Detail?run_id={rid}"
+    return (
+        f"Triggered run **#{rid}** for **{agent.name}** using recipe **{recipe.name}**. "
+        f"[View details]({detail_url})."
+    )
+
+
+def _dispatch_command(cmd: SlashCommand) -> Optional[str]:
+    if cmd.name == "sop":
+        agent_name, recipe_name, tools, created, yml, run_id = _handle_sop(cmd)
+        detail_url = f"/Run_Detail?run_id={run_id}" if run_id else None
+        st.success(
+            f"Recipe **{recipe_name}** attached to agent **{agent_name}**. "
+            f"Run {run_id or '—'} completed."
+        )
+        if detail_url:
+            st.markdown(f"[Open run details]({detail_url})")
+        if tools:
+            st.write("Tools referenced:", tools)
+        if created:
+            st.write("New tools scaffolded:", created)
+        with st.expander("Generated YAML", expanded=False):
+            st.code(yml, language="yaml")
+        return (
+            f"Attached recipe '{recipe_name}' to '{agent_name}' and executed run {run_id or '—'}."
+        )
+
+    if cmd.name == "agent" and cmd.action == "run":
+        message = _handle_agent_run(cmd)
+        st.success(message)
+        return message
+
+    if cmd.name == "recipe" and cmd.action == "new":
+        message = _handle_recipe_new(cmd)
+        st.success(message)
+        return message
+
+    if cmd.name == "recipe" and cmd.action == "attach":
+        message = _handle_recipe_attach(cmd)
+        st.info(message)
+        return message
+
+    raise SlashCommandError(
+        f"Unsupported command '/{cmd.name}{' ' + cmd.action if cmd.action else ''}'."
+    )
 
 # --- LLM call helper (no auto-mock) -----------------------------------------
 def _llm_reply(messages: list[dict], json_mode: bool) -> str:
@@ -134,20 +304,24 @@ if prompt:
     st.session_state["conversation"].append({"role": "user", "content": prompt})
 
     # Handle /sop shortcut
-    if prompt.strip().lower().startswith("/sop"):
+    if prompt.strip().startswith("/"):
         with st.chat_message("assistant"):
-            with st.spinner("Generating recipe, attaching to agent, ensuring tools, running..."):
-                try:
-                    agent_name, recipe_name, tools, created, yml, run_id = _handle_sop(prompt)
-                    st.success(f"Recipe **{recipe_name}** attached to agent **{agent_name}**. Run {run_id} completed.")
-                    if tools:
-                        st.write("Tools referenced:", tools)
-                    if created:
-                        st.write("New tools scaffolded:", created)
-                    with st.expander("Generated YAML", expanded=False):
-                        st.code(yml, language="yaml")
-                except Exception as e:
-                    st.error(f"SOP pipeline failed: {type(e).__name__}: {e}")
+            try:
+                cmd = parse_slash_command(prompt)
+                with st.spinner("Processing command..."):
+                    summary = _dispatch_command(cmd)
+                if summary:
+                    st.session_state["conversation"].append(
+                        {"role": "assistant", "content": summary}
+                    )
+            except SlashCommandError as e:
+                st.error(str(e))
+                hint_source = locals().get("cmd") if "cmd" in locals() else None
+                st.caption(
+                    usage_hint(hint_source) if hint_source else usage_hint(prompt.split()[0].lstrip("/"))
+                )
+            except Exception as e:
+                st.error(f"Command failed: {type(e).__name__}: {e}")
     else:
         with st.chat_message("assistant"):
             try:
