@@ -1,3 +1,15 @@
+"""
+Chat page for the Streamlit AV operations assistant.
+
+This script defines the chat interface along with helpers for handling
+slash commands that convert a standard operating procedure (SOP) into
+a recipe, attach it to an agent, and execute it.  It also exposes
+functions for creating new recipes, attaching existing recipes to agents,
+and running a recipe via a slash command.  Secrets are resolved from
+the active provider and stored in the environment to be consumed by
+`core.llm.client`.
+"""
+
 import os
 import re
 import textwrap
@@ -15,13 +27,21 @@ from core.recipes.from_sop import sop_to_recipe_yaml
 from core.recipes.service import save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
 from core.ui.page_tips import show as show_tip
-from core.utils.slash_commands import (SlashCommand, SlashCommandError, parse_slash_command, usage_hint)
+from core.utils.slash_commands import (
+    SlashCommand,
+    SlashCommandError,
+    parse_slash_command,
+    usage_hint,
+)
 from core.workflow.engine import execute_recipe_run
+from core.secrets import get_active_key, is_mock_enabled
 
-PAGE_KEY = "Chat"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+
+# -----------------------------------------------------------------------------
+# Page setup
+#
+PAGE_KEY = "Chat"  # identifies this page in the page tips helper
 show_tip(PAGE_KEY)
-# New: robust secret handling + provider selection
-from core.secrets import get_active_key, is_mock_enabled, pick_active_provider
 
 st.title("💬 Chat")
 
@@ -29,50 +49,70 @@ st.title("💬 Chat")
 with st.sidebar:
     st.subheader("Task helpers")
     st.markdown("Use **/sop** to convert text → recipe → attach → run. Example:")
-    st.code("/sop agent=Support name=\"Projector Reset\"\nSteps:\n- Gather_room\n- Reset projector\n- Verify image via Slack")
+    st.code(
+        "/sop agent=Support name=\"Projector Reset\"\n"
+        "Steps:\n"
+        "- Gather_room\n"
+        "- Reset projector\n"
+        "- Verify image via Slack"
+    )
     json_mode = st.checkbox("JSON mode (raw tool payloads)", value=False)
+    # Present a set of example slash commands for users to copy/paste.  A raw
+    # triple-quoted string keeps backslashes and quotes intact.
     st.markdown(
         r"""
-    **Slash commands (copy/paste)**
-    ```text
-    /sop agent=Support name="Projector Reset"
-    Steps:
-    - Gather room_id
-    - Reset projector via Q-SYS
-    - Verify image via Slack
+**Slash commands (copy/paste)**
+```text
+/sop agent=Support name="Projector Reset"
+Steps:
+- Gather room_id
+- Reset projector via Q-SYS
+- Verify image via Slack
 
-    /recipe new "Projector Reset"
+/recipe new "Projector Reset"
 
-    /recipe attach agent="Support" recipe="Projector Reset"
+/recipe attach agent="Support" recipe="Projector Reset"
 
-    /agent run "Support" recipe="Projector Reset"
+/agent run "Support" recipe="Projector Reset"
 
-    /tool health calendar_scheduler
+/tool health calendar_scheduler
 
-    /tool action incident_ticketing '{"action":"create","args":{"title":"Zoom HDMI Black","description":"HDMI input shows black screen"}}'
+/tool action incident_ticketing '{"action":"create","args":{"title":"Zoom HDMI Black","description":"HDMI input shows black screen"}}'
 
-    /kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com)'''"""
+/kb scout "zoom room hdmi black" allow=support.zoom.com,logitech.com
+```
+"""
     )
-    st.caption("Tip: Wrap multi-word names in quotes. Key/value pairs accept agent=, recipe=, etc.")
+    st.caption(
+        "Tip: Wrap multi-word names in quotes. Key/value pairs accept agent=, "
+        "recipe=, etc."
+    )
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
-provider_key, provider_name, key_source = get_active_key()  # ('openai'|'anthropic') and the key + source string
+# Determine which LLM provider and key are active.  These values are pulled
+# from Streamlit secrets or environment variables.  If no key is available
+# the chat helper will raise an exception when invoked.
+provider_key, provider_name, key_source = get_active_key()  # ("openai"|"anthropic"), key, and source
 mcp_mock = is_mock_enabled()  # for MCP tools only; chat will not auto-mock
 
+
 def _mask(k: str | None) -> str:
+    """Mask API keys for display in the UI."""
     if not k:
         return "missing"
     if len(k) <= 8:
         return "••••"
     return f"••••{k[-4:]}"
 
+
 st.caption(
-    f"Model: {('🟢' if provider_name=='openai' else '🔵')} {provider_name} • "
+    f"Model: {('🟢' if provider_name == 'openai' else '🔵')} {provider_name} • "
     f"key source: {key_source} • MCP mock: {mcp_mock}"
 )
 
-# Export to environment so core.llm.client can pick them up (without refactor)
-# We do NOT store secrets in session. We just expose what the chosen provider needs.
+# Export the chosen provider and API key to the environment so that
+# core.llm.client.chat() reads them without further configuration.  We do
+# NOT store secrets in st.session_state.
 os.environ["LLM_PROVIDER"] = provider_name
 if provider_name == "openai":
     if provider_key:
@@ -82,21 +122,28 @@ else:
         os.environ["ANTHROPIC_API_KEY"] = provider_key
 
 # --- Conversation state ------------------------------------------------------
+# Initialise the conversation on first page load.  A system prompt sets
+# the assistant persona.
 if "conversation" not in st.session_state:
     st.session_state["conversation"] = [
-        {"role": "system", "content": "You are an AV operations assistant."}
+        {"role": "system", "content": "You are an AV operations assistant."},
     ]
 
-def _render_messages():
+
+def _render_messages() -> None:
+    """Render the conversation history in the chat interface."""
     for m in st.session_state["conversation"]:
-        with st.chat_message(m["role"] if m["role"] != "system" else "assistant"):
-            # Avoid dumping system role literally; show as assistant context
+        # Display system messages as assistant context, hiding the role label.
+        role = m["role"] if m["role"] != "system" else "assistant"
+        with st.chat_message(role):
             if m["role"] == "system":
                 st.write(f"_{m['content']}_")
             else:
                 st.write(m["content"])
 
+
 def _extract_option(cmd: SlashCommand, text: str, key: str, default: Optional[str] = None) -> str:
+    """Extract an option value from a SlashCommand or a fallback from the raw text."""
     value = cmd.option(key)
     if value:
         return value
@@ -106,7 +153,8 @@ def _extract_option(cmd: SlashCommand, text: str, key: str, default: Optional[st
     return default or ""
 
 
-def _handle_sop(cmd: SlashCommand):
+def _handle_sop(cmd: SlashCommand) -> tuple[str, str, list, list, str, Optional[int]]:
+    """Convert an SOP into a recipe, attach it to an agent, and run it."""
     agent_name = _extract_option(cmd, cmd.raw, "agent", "Support")
     recipe_name = _extract_option(cmd, cmd.raw, "name", "Generated Recipe")
 
@@ -125,18 +173,20 @@ def _handle_sop(cmd: SlashCommand):
 
 
 def _slugify(name: str) -> str:
+    """Normalize a name into a slug suitable for filenames."""
     cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", name).strip("-")
     return cleaned.lower() or "recipe"
 
 
 def _handle_recipe_new(cmd: SlashCommand) -> str:
+    """Create a new recipe scaffold with guardrails from a slash command."""
     name = cmd.option("name") or (cmd.args[0] if cmd.args else None)
     if not name:
         raise SlashCommandError(usage_hint("recipe", "new"))
 
     yaml_filename = f"{_slugify(name)}.yaml"
     guardrail_template = textwrap.dedent(
-        f"""\
+        f"""
         name: {name}
         description: Auto-generated from chat command
         guardrails:
@@ -160,16 +210,25 @@ def _handle_recipe_new(cmd: SlashCommand) -> str:
     save_recipe_yaml(yaml_filename, guardrail_template)
 
     with get_session() as db:  # type: ignore
-        existing = db.query(Recipe).filter(func.lower(Recipe.name) == name.lower()).first()
+        existing = (
+            db.query(Recipe)
+            .filter(func.lower(Recipe.name) == name.lower())
+            .first()
+        )
         if existing:
-            return f"Recipe **{existing.name}** already exists. Updated YAML file {yaml_filename}."
+            return (
+                f"Recipe **{existing.name}** already exists. Updated YAML file {yaml_filename}."
+            )
         recipe = Recipe(name=name, yaml_path=yaml_filename)
         db.add(recipe)
         db.commit()
-    return f"Recipe **{name}** scaffolded with guardrails → `{yaml_filename}`. Review it under 📜 Recipes."
+    return (
+        f"Recipe **{name}** scaffolded with guardrails → `{yaml_filename}`. Review it under 📜 Recipes."
+    )
 
 
 def _handle_recipe_attach(cmd: SlashCommand) -> str:
+    """Attach an existing recipe to an agent from a slash command."""
     agent_name = cmd.option("agent") or (cmd.args[0] if cmd.args else None)
     recipe_name = cmd.option("recipe") or (cmd.args[1] if len(cmd.args) > 1 else None)
     if not agent_name or not recipe_name:
@@ -203,6 +262,7 @@ def _handle_recipe_attach(cmd: SlashCommand) -> str:
 
 
 def _handle_agent_run(cmd: SlashCommand) -> str:
+    """Trigger a recipe run on a given agent from a slash command."""
     agent_name = cmd.option("agent") or (cmd.args[0] if cmd.args else None)
     recipe_name = cmd.option("recipe") or (cmd.args[1] if len(cmd.args) > 1 else None)
     if not agent_name or not recipe_name:
@@ -238,6 +298,7 @@ def _handle_agent_run(cmd: SlashCommand) -> str:
 
 
 def _dispatch_command(cmd: SlashCommand) -> Optional[str]:
+    """Dispatch slash commands to the appropriate handlers."""
     if cmd.name == "sop":
         agent_name, recipe_name, tools, created, yml, run_id = _handle_sop(cmd)
         detail_url = f"/Run_Detail?run_id={run_id}" if run_id else None
@@ -273,23 +334,20 @@ def _dispatch_command(cmd: SlashCommand) -> Optional[str]:
         return message
 
     raise SlashCommandError(
-        f"Unsupported command '/{cmd.name}{' ' + cmd.action if cmd.action else ''}'."
+        f"Unsupported command '/{cmd.name}{(' ' + cmd.action) if cmd.action else ''}'."
     )
 
-# --- LLM call helper (no auto-mock) -----------------------------------------
+
 def _llm_reply(messages: list[dict], json_mode: bool) -> str:
-    """
-    Calls your core.llm.client.chat(...) with the chosen provider.
-    Fails loudly if keys are missing or provider call fails. Does NOT auto-mock.
-    """
+    """Call the LLM provider with the accumulated conversation and return its reply."""
     if not provider_key:
         raise RuntimeError(
             f"No API key available for {provider_name}. "
             f"Set Streamlit secrets or provide an env var. (source tried: {key_source})"
         )
     # core.llm.client.chat should read provider from env or session.
-    # We already set LLM_PROVIDER and the correct API key in os.environ above.
     return chat(messages, json_mode=json_mode)
+
 
 # --- UI rendering + interaction ---------------------------------------------
 _render_messages()
@@ -298,7 +356,7 @@ prompt = st.chat_input("Type your message (/sop ... to build & run from SOP)")
 if prompt:
     st.session_state["conversation"].append({"role": "user", "content": prompt})
 
-    # Handle /sop shortcut
+    # Handle commands starting with a slash
     if prompt.strip().startswith("/"):
         with st.chat_message("assistant"):
             try:
@@ -318,6 +376,7 @@ if prompt:
             except Exception as e:
                 st.error(f"Command failed: {type(e).__name__}: {e}")
     else:
+        # Regular chat; send the accumulated conversation to the LLM provider
         with st.chat_message("assistant"):
             try:
                 with st.spinner("Thinking..."):
@@ -327,7 +386,7 @@ if prompt:
             except Exception as e:
                 # Show the reason (keys missing, network error, quota, etc.)
                 st.error(f"LLM call failed: {type(e).__name__}: {e}")
-                # Optionally: provide a quick hint
+                # Provide troubleshooting tips
                 with st.expander("Troubleshoot", expanded=False):
                     st.markdown(
                         "- Confirm **Settings → provider** matches your intended model\n"
@@ -339,8 +398,14 @@ if prompt:
                     )
                 with st.expander("LLM self-test (temporary)"):
                     try:
-                        t = chat([{"role":"system","content":"You are test."},{"role":"user","content":"Say 'real' if this is a real provider call."}], json_mode=False)
+                        t = chat(
+                            [
+                                {"role": "system", "content": "You are test."},
+                                {"role": "user", "content": "Say 'real' if this is a real provider call."},
+                            ],
+                            json_mode=False,
+                        )
                         st.success("Provider call succeeded.")
                         st.code(t)
                     except Exception as e:
-                        st.error(f"Provider call failed: {type(e).__name__}: {e}""")
+                        st.error(f"Provider call failed: {type(e).__name__}: {e}")
