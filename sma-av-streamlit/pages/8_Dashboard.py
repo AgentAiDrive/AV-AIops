@@ -328,13 +328,10 @@ with left:
 
     st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id_int}")
     st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
-    st.page_link(
-        "pages/8_Run_Detail.py",
-        label="Open full run details",
-        page_args={"run_id": selected_id_int},
-        icon="🔎",
-    )
-
+    st.page_link("pages/8_Run_Detail.py",
+             label="Open full run details",
+             page_args={"run_id": selected_id_int},
+             icon="🔎")
     # Steps
     st.markdown("**Steps**")
     steps = detail.get("steps", [])
@@ -429,3 +426,4 @@ with get_session() as db:  # type: ignore
             f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
             unsafe_allow_html=True,
         )
+
