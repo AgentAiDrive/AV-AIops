@@ -1,16 +1,17 @@
-# sma-av-streamlit/pages/08_Dashboard.py
+# sma-av-streamlit/pages/8_Dashboard.py
 from __future__ import annotations
+
 import json
-from datetime import datetime, timedelta, timezone
 import math
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 # Core stores/services
-from core.runs_store import RunStore
+from core.runstore_factory import make_runstore
 from core.db.session import get_session
 from core.workflow.service import list_workflows
 
@@ -19,20 +20,9 @@ st.title("📊 Dashboard")
 st.caption("AV AI OPS — Live view of workflow runs, steps, artifacts, and KPIs.")
 
 # ---------------------------------------------------------------------------
-# Store init (be liberal in how RunStore is constructed)
+# Shared RunStore
 # ---------------------------------------------------------------------------
-
-def _make_store() -> RunStore:
-    """Instantiate RunStore with a stable DB path if supported, else fallback."""
-    db_path = Path(__file__).resolve().parents[1] / "avops.db"
-    try:
-        # Newer RunStore that accepts a path
-        return RunStore(db_path=db_path)
-    except TypeError:
-        # Older RunStore: no arguments
-        return RunStore()
-
-store = _make_store()
+store = make_runstore()
 
 # ---------------------------------------------------------------------------
 # Sidebar controls
@@ -45,13 +35,12 @@ with st.sidebar:
     auto = st.toggle("Auto-refresh (5s)", value=False)
     st.caption("Tip: If nothing appears, run a Workflow or /sop from Chat.")
 
-# best-effort auto refresh (only if the helper is installed)
 if auto:
     try:
         from streamlit_autorefresh import st_autorefresh
         st_autorefresh(interval=5000, key="dash_refresh")
     except Exception:
-        st.info("Install `streamlit-autorefresh` for auto refresh, or click the refresh button in your browser.")
+        st.info("Install `streamlit-autorefresh` for auto refresh, or click refresh.")
 
 # ---------------------------------------------------------------------------
 # Time window → since
@@ -66,26 +55,35 @@ elif win == "30d":
     since = now - timedelta(days=30)
 
 # ---------------------------------------------------------------------------
-# Compatibility helpers (RunStore API may differ between versions)
+# Helpers for heterogeneous stores
 # ---------------------------------------------------------------------------
-def _stats_compat(store: RunStore, *, hours: Optional[int] = None, since: Optional[datetime] = None) -> Dict[str, Any]:
+def _to_dt(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _stats_compat(store, *, hours: Optional[int] = None, since: Optional[datetime] = None) -> Dict[str, Any]:
     """Call store.stats with whatever signature it supports."""
-    # Prefer hours if provided
     if hours is not None:
         try:
             return store.stats(hours=hours)
         except TypeError:
             pass
-    # Try since=
     if since is not None:
         try:
             return store.stats(since=since)
         except TypeError:
             pass
-    # Last resort: no args
     return store.stats()
 
-def _latest_runs_compat(store: RunStore, *, limit: int, statuses: List[str], since: Optional[datetime]) -> List[Dict[str, Any]]:
+
+def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Optional[datetime]) -> List[Dict[str, Any]]:
     """Fetch runs using the first available method and normalize rough filtering."""
     # Try latest_runs(limit=?, status=?)
     try:
@@ -103,7 +101,7 @@ def _latest_runs_compat(store: RunStore, *, limit: int, statuses: List[str], sin
                 rows = store.list_runs()
             except Exception:
                 rows = []
-    # If rows are strings (JSON), parse
+    # Parse JSON strings if necessary
     out = []
     for r in rows:
         if isinstance(r, str):
@@ -112,15 +110,23 @@ def _latest_runs_compat(store: RunStore, *, limit: int, statuses: List[str], sin
             except Exception:
                 continue
         out.append(r)
-    # Window filter if we got ISO strings
+
+    # Time-window filter using parsed timestamps
     if since:
-        iso = since.isoformat()
-        out = [r for r in out if str(r.get("started_at") or r.get("start") or "") >= iso]
-    # Status filter if the store didn't apply it
+        def _ts_row(rr: Dict[str, Any]) -> Optional[datetime]:
+            return _to_dt(
+                rr.get("started_at")
+                or rr.get("start")
+                or rr.get("created_at")
+                or rr.get("ts")
+                or rr.get("time")
+            )
+        out = [r for r in out if (_ts_row(r) or datetime.min.replace(tzinfo=timezone.utc)) >= since]
+
+    # Status mapping if store didn't filter
     def _status_of(r: Dict[str, Any]) -> str:
         if "status" in r and r["status"]:
             return str(r["status"])
-        # derive from ok/running fields
         if r.get("running"):
             return "running"
         if r.get("ok") is True:
@@ -128,24 +134,28 @@ def _latest_runs_compat(store: RunStore, *, limit: int, statuses: List[str], sin
         if r.get("ok") is False:
             return "failed"
         return "unknown"
+
     out = [r for r in out if _status_of(r) in statuses]
     return out
 
-def _to_dt(v: Any) -> Optional[datetime]:
-    if not v:
-        return None
-    if isinstance(v, datetime):
-        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
-    try:
-        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-    except Exception:
-        return None
 
 def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
     """Map heterogeneous run dicts into a common shape for the UI."""
     meta = r.get("meta") or {}
-    started = _to_dt(r.get("started_at") or r.get("start"))
-    finished = _to_dt(r.get("finished_at") or r.get("end"))
+    started = _to_dt(
+        r.get("started_at")
+        or r.get("start")
+        or r.get("created_at")
+        or r.get("ts")
+        or r.get("time")
+    )
+    finished = _to_dt(
+        r.get("finished_at")
+        or r.get("end")
+        or r.get("completed_at")
+        or r.get("finish")
+        or r.get("done_at")
+    )
     duration_ms = r.get("duration_ms")
     if duration_ms is None:
         if r.get("duration_s") is not None:
@@ -155,6 +165,7 @@ def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
                 duration_ms = None
         elif started and finished:
             duration_ms = (finished - started).total_seconds() * 1000.0
+
     status = r.get("status")
     if not status:
         if r.get("running"):
@@ -165,6 +176,7 @@ def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
             status = "failed"
         else:
             status = "unknown"
+
     name = r.get("name") or r.get("title") or meta.get("workflow_name") or "Run"
     agent_id = r.get("agent_id") or meta.get("agent_id")
     recipe_id = r.get("recipe_id") or meta.get("recipe_id")
@@ -183,12 +195,11 @@ def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
         "raw": r,
     }
 
-def _run_details_compat(store: RunStore, run_id: Any) -> Dict[str, Any]:
-    """Fetch run details if available; otherwise synthesize from recent rows."""
+
+def _run_details_compat(store, run_id: Any) -> Dict[str, Any]:
     try:
         return store.run_details(run_id)
     except Exception:
-        # Some stores don’t expose run_details; return a minimal dict
         return {"id": run_id, "steps": [], "artifacts": []}
 
 # ---------------------------------------------------------------------------
@@ -199,19 +210,13 @@ if since:
     hours_for_stats = max(1, int((now - since).total_seconds() // 3600))
 
 stats = _stats_compat(store, hours=hours_for_stats, since=since)
-
-# Normalize some expected fields with good fallbacks
 runs_total = stats.get("runs") or stats.get("count") or 0
 success_rate = stats.get("success_rate")
 if success_rate is None:
     ok = stats.get("ok") or 0
-    if runs_total:
-        success_rate = 100.0 * float(ok) / float(runs_total)
-    else:
-        success_rate = 0.0
+    success_rate = (100.0 * float(ok) / float(runs_total)) if runs_total else 0.0
 p95_ms = stats.get("p95_ms")
 if p95_ms is None:
-    # Some stores expose p95_s
     p95_s = stats.get("p95_s")
     p95_ms = (float(p95_s) * 1000.0) if p95_s is not None else 0.0
 last_error = stats.get("last_error") or ""
@@ -227,7 +232,6 @@ c4.metric("Last error", last_error or "—")
 # ---------------------------------------------------------------------------
 rows_raw = _latest_runs_compat(store, limit=200, statuses=statuses, since=since)
 rows = [_normalize_run(r) for r in rows_raw]
-rows = [r for r in rows if r["started_at"] is not None]  # drop malformed
 
 if not rows:
     st.info("No runs in this window. Trigger a workflow from **🧩 Workflows** or use **/sop** in **💬 Chat**.")
@@ -246,11 +250,11 @@ records = [
     }
     for r in rows
 ]
-
 df_all = pd.DataFrame(records)
 df_all.sort_values("started_at", ascending=False, inplace=True)
 
 total_runs = len(df_all)
+page_size = max(1, int(page_size))
 total_pages = max(1, math.ceil(total_runs / page_size))
 if "runs_page" not in st.session_state:
     st.session_state["runs_page"] = 1
@@ -318,7 +322,6 @@ detail = _run_details_compat(store, selected_id_int)
 left, right = st.columns([2, 1], vertical_alignment="top")
 
 with left:
-    # Try to enrich the header from the normalized rows
     selected_row = next((r for r in rows if r["id"] == selected_id), None)
     title = (selected_row or {}).get("name") or detail.get("name") or "Run"
     agent_id = (selected_row or {}).get("agent_id") or detail.get("agent_id")
@@ -328,10 +331,11 @@ with left:
 
     st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id_int}")
     st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
-    st.page_link("pages/8_Run_Detail.py",
-             label="Open full run details",
-             page_args={"run_id": selected_id_int},
-             icon="🔎")
+
+    # NOTE: st.page_link doesn't support page_args — use direct querystring
+    detail_url = f"/Run_Detail?run_id={selected_id_int}"
+    st.page_link(detail_url, label="Open full run details", icon="🔎")
+
     # Steps
     st.markdown("**Steps**")
     steps = detail.get("steps", [])
@@ -361,9 +365,9 @@ with left:
             level = s.get("level") or "info"
             phase = s.get("phase") or "—"
             msg = s.get("message") or s.get("msg") or "—"
-            status = s.get("status") or "—"
+            stts = s.get("status") or "—"
             ts = s.get("ts") or s.get("time") or "—"
-            with st.expander(f"[{phase}] {msg}  —  {status} · {ts}", expanded=False):
+            with st.expander(f"[{phase}] {msg}  —  {stts} · {ts}", expanded=False):
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**Payload**")
@@ -412,13 +416,13 @@ with right:
 # Workflows panel (from SQLAlchemy DB)
 # ---------------------------------------------------------------------------
 st.subheader("Workflows")
-from core.workflow.service import compute_status  # optional color
-
 with get_session() as db:  # type: ignore
     wfs = list_workflows(db)
     if not wfs:
         st.info("No workflows defined yet.")
     for wf in wfs:
+        # Optional color from compute_status if desired
+        from core.workflow.service import compute_status
         status = compute_status(wf)
         dot = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(status, "⚪")
         st.markdown(
@@ -426,4 +430,3 @@ with get_session() as db:  # type: ignore
             f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
             unsafe_allow_html=True,
         )
-
