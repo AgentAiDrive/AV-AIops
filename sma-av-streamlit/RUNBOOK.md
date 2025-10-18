@@ -95,7 +95,7 @@ OO Dashboard
 
 - **SOP → Recipe draft**
   ```
-  /sop Agent=Support Name=Projector Reset
+  /sop agent=Support name="Projector Reset"
   Steps:
   - Gather room_id
   - Reset projector via Q-SYS
@@ -104,15 +104,17 @@ OO Dashboard
   → Shows IPAV YAML draft; “Save Recipe” / “Attach to Agent”.
 
 - **Recipe management**
-  - `/recipe new <name>`
-  - `/recipe attach agent=<agent> recipe=<recipe>`
+  - `/recipe new "Projector Reset"`
+  - `/recipe attach agent="Support" recipe="Projector Reset"`
 
 - **Agent runs**
-  - `/agent run <agent> recipe=<recipe>`
+  - `/agent run "Support" recipe="Projector Reset"`
 
 - **MCP diagnostics**
-  - `/tool health <tool>`
-  - `/tool action <tool> {json}`
+  - `/tool health calendar_scheduler`
+  - `/tool action incident_ticketing '{"action":"create","args":{...}}'`
+
+> **Quoting tip:** wrap multi-word names in double quotes. Key/value pairs accept `agent=`, `recipe=`, `name=`, etc., and JSON bodies should be quoted as shown above.
 
 - **KB-Recipe Scout**
   ```
@@ -155,8 +157,13 @@ OO Dashboard
 
 ## 📜 Recipes
 
-**Purpose**  
-- Author YAML recipes with IPAV sections; validate and version them.
+**Purpose**
+- Author YAML recipes with IPAV sections; validate, add guardrails, and version them.
+
+**Best practices**
+- Include `guardrails.timeout_minutes` and `guardrails.rollback_actions` for every recipe.
+- Track `success_metrics` to surface KPIs on the dashboard.
+- Commit YAML changes to Git (`git commit -am "recipe: add timeout"`) so teammates can review guardrails.
 
 **Minimal scaffold**  
 ```yaml
@@ -195,8 +202,9 @@ guardrails:
 
 ## 🧰 MCP Tools
 
-**Purpose**  
+**Purpose**
 - Discover/check local tool connectors; call `/health` and `/action` (mock or real).
+- Sample connectors ship with the app: `calendar_scheduler`, `incident_ticketing`, `qsys_control`, and `extron_control`.
 
 **Health card snippet**  
 ```python

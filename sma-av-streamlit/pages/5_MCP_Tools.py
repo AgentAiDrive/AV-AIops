@@ -1,17 +1,22 @@
 
+import json
+import os
+from pathlib import Path
+
 import streamlit as st
-import os, json
+import requests
+
 from core.mcp.scaffold import scaffold
 # paste this at the top of any page
-import streamlit as st
 from core.ui.page_tips import show as show_tip
 
 PAGE_KEY = "MCP Tools"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
 show_tip(PAGE_KEY)
 
 st.title("🧰 MCP Tools")
-tools_dir = os.path.join(os.getcwd(), "core", "mcp", "tools")
-os.makedirs(tools_dir, exist_ok=True)
+tools_dir = Path(os.getcwd()) / "core" / "mcp" / "tools"
+tools_dir.mkdir(parents=True, exist_ok=True)
+st.caption("Sample connectors provided for calendars, Q-SYS/Extron devices, and incident ticketing.")
 
 def health_card(name: str, base_url: str):
     try:
@@ -30,19 +35,29 @@ def health_card(name: str, base_url: str):
 # health_card("Zoom", "http://localhost:8902")
 
 st.subheader("Discovered Tools")
-found = []
-for entry in os.scandir(tools_dir):
-    if entry.is_dir():
-        found.append(entry.name)
+found = [entry for entry in tools_dir.iterdir() if entry.is_dir()]
 if found:
-    for t in sorted(found):
+    for t in sorted(found, key=lambda p: p.name):
+        manifest_path = t / "manifest.json"
+        readme_path = t / "README.md"
         with st.container(border=True):
-            st.markdown(f"**{t}**")
-            man = os.path.join(tools_dir, t, "manifest.json")
-            if os.path.exists(man):
-                st.code(open(man, "r", encoding="utf-8").read(), language="json")
+            st.markdown(f"**{t.name}**")
+            if manifest_path.exists():
+                try:
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    st.json(manifest)
+                except Exception as e:
+                    st.error(f"Failed to parse manifest: {e}")
+            if readme_path.exists():
+                with st.expander("View notes"):
+                    st.markdown(readme_path.read_text(encoding="utf-8"))
 else:
     st.info("No tools discovered yet.")
+
+sample_readme = tools_dir / "README.md"
+if sample_readme.exists():
+    with st.expander("How to build custom MCP tools", expanded=False):
+        st.markdown(sample_readme.read_text(encoding="utf-8"))
 
 st.subheader("Scaffold New Tool")
 name = st.text_input("Tool name (e.g. slack)")
