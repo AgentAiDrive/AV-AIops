@@ -51,10 +51,10 @@ def _parse_tokens(tail: str) -> List[str]:
     try:
         return shlex.split(tail, posix=True)
     except ValueError as exc:
+        # Keep the message simple to avoid escape gymnastics
         raise SlashCommandError(
-            "Could not parse arguments. Wrap multi-word values in quotes (\"...")"
+            'Could not parse arguments. Wrap multi-word values in quotes, e.g., "Projector Reset".'
         ) from exc
-
 
 def parse_slash_command(text: str) -> SlashCommand:
     """Parse `/agent run ...` style commands using shlex for quoting."""
