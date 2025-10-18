@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 class SlashCommandError(ValueError):
@@ -13,7 +13,6 @@ class SlashCommandError(ValueError):
 @dataclass
 class SlashCommand:
     """Normalized representation of a chat slash command."""
-
     name: str
     action: Optional[str]
     args: List[str]
@@ -25,6 +24,7 @@ class SlashCommand:
         return self.options.get(key.lower(), default)
 
 
+# Keep hints simple to avoid escaping issues
 _USAGE_HINTS: Dict[str, str] = {
     "agent:run":   'Usage: /agent run <agent name> recipe="<recipe name>"',
     "recipe:new":  'Usage: /recipe new <recipe name>',
@@ -35,7 +35,7 @@ _USAGE_HINTS: Dict[str, str] = {
 }
 
 
-def _split_head_tail(command: str) -> tuple[str, Optional[str], str]:
+def _split_head_tail(command: str) -> Tuple[str, Optional[str], str]:
     parts = command.strip().split(None, 2)
     if not parts:
         raise SlashCommandError("Slash command is empty. Type /help for examples.")
@@ -51,17 +51,16 @@ def _parse_tokens(tail: str) -> List[str]:
     try:
         return shlex.split(tail, posix=True)
     except ValueError as exc:
-        # Keep the message simple to avoid escape gymnastics
+        # Simple message; no tricky escaping
         raise SlashCommandError(
             'Could not parse arguments. Wrap multi-word values in quotes, e.g., "Projector Reset".'
         ) from exc
 
+
 def parse_slash_command(text: str) -> SlashCommand:
     """Parse `/agent run ...` style commands using shlex for quoting."""
-
     if not text.strip().startswith("/"):
         raise SlashCommandError("Commands must start with '/'.")
-
     first_line, *rest = text.strip().splitlines()
     command_text = first_line.lstrip("/")
     body = "\n".join(rest).strip()
@@ -94,3 +93,16 @@ def usage_hint(command: SlashCommand | str, action: Optional[str] = None) -> str
     else:
         key = f"{command}:{action}" if action else command
     return _USAGE_HINTS.get(key, "See sidebar examples for supported commands.")
+
+
+# ---- Back-compat + explicit exports -----------------------------------------
+# Some older files may import the private name; keep a shim so they don't crash.
+_usage_hint = usage_hint
+
+__all__ = [
+    "SlashCommand",
+    "SlashCommandError",
+    "parse_slash_command",
+    "usage_hint",
+    "_usage_hint",   # temporary back-compat export
+]
