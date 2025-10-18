@@ -1,0 +1,78 @@
+id: zoom-room-healthcheck-v1
+title: Zoom Room Proactive Health Check
+version: 1.0.0
+owner: av-ops
+tags: [maintenance, zoom, telemetry, proactive]
+description: >
+  Poll Zoom Room status, run synthetic join test (if safe), collect logs, and file findings.
+  Posts a concise health card to Slack and creates a SNOW task when threshold breached.
+
+inputs:
+  roomId: {type: string, required: true, description: "Zoom Room ID"}
+  channel: {type: string, required: false, default: "#av-rooms"}
+  thresholds:
+    type: object
+    required: false
+    default:
+      cpu_percent: 85
+      packet_loss: 3.0
+      jitter_ms: 30
+      last_reboot_hours: 168
+
+steps:
+  - id: get-status
+    action: get_room_status
+    using: mcp-zoom
+    params: {roomId: "{{inputs.roomId}}"}
+    saves: {status: $.status, metrics: $.metrics}
+    fallback:
+      simulate: true
+      saves:
+        status: "online"
+        metrics: {cpu_percent: 22, packet_loss: 0.2, jitter_ms: 12, last_reboot_hours: 240}
+
+  - id: synthetic-join
+    when: "{{s.status == 'online'}}"
+    action: run_synthetic_meeting_test
+    using: mcp-zoom
+    params: {roomId: "{{inputs.roomId}}", duration_sec: 20}
+    saves: {synthetic: $.summary}
+    fallback:
+      simulate: true
+      saves: {synthetic: {mos: 4.5, packet_loss: 0.3, jitter_ms: 11}}
+
+  - id: evaluate
+    action: evaluate_thresholds
+    using: local
+    params:
+      metrics: "{{s.metrics}}"
+      thresholds: "{{inputs.thresholds}}"
+    saves: {breaches: $.breaches, ok: $.ok}
+
+  - id: notify
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.channel}}"
+      text: |
+        🩺 Zoom Room {{inputs.roomId}} health: {{ 'OK' if s.ok else 'Issues' }}
+        Metrics: {{s.metrics | to_json}}
+        Synthetic: {{s.synthetic | to_json}}
+        Breaches: {{s.breaches | to_json}}
+    fallback: {simulate: true}
+
+  - id: file-task
+    when: "{{not s.ok}}"
+    action: create_task
+    using: mcp-servicenow
+    params:
+      short_description: "Room {{inputs.roomId}} health threshold breach"
+      description: "Breaches: {{s.breaches | to_json}}"
+      assignment_group: "AV Operations"
+    fallback: {simulate: true}
+
+outputs:
+  health:
+    ok: "{{s.ok}}"
+    breaches: "{{s.breaches}}"
+    metrics: "{{s.metrics}}"

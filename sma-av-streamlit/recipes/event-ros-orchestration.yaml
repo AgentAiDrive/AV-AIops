@@ -1,0 +1,65 @@
+id: event-ros-orchestration-v1
+title: Event Run-of-Show Orchestration
+version: 1.0.0
+owner: av-events
+tags: [events, runbook, orchestration, slack, checklist]
+description: >
+  Drives an Event Day RoS: preflight checks, comms check, record/stream start,
+  speaker mic/cam presets, lower-thirds cues, capture handoff, and teardown.
+
+inputs:
+  eventId: {type: string, required: true}
+  channel:  {type: string, required: false, default: "#av-events"}
+  ros:
+    type: array
+    required: false
+    description: "Optional override RoS steps"
+    default:
+      - "T‑60: preflight checks"
+      - "T‑30: comms check"
+      - "T‑10: audience open"
+      - "T‑00: start recording/stream"
+      - "T+30: lower‑thirds on first speaker"
+      - "Wrap: archive & handoff"
+
+steps:
+  - id: preflight
+    action: run_checklist
+    using: local
+    params:
+      items:
+        - "Switchers online"
+        - "Cameras white‑balanced"
+        - "Audio headroom -12 dBFS"
+        - "Backup recorders armed"
+    saves: {preflight_ok: true}
+
+  - id: event-announce
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.channel}}"
+      text: "🎬 Event {{inputs.eventId}} is live. Following RoS: {{inputs.ros | to_json}}"
+    fallback: {simulate: true}
+
+  - id: start-record
+    action: control_device
+    using: mcp-zoom
+    params: {eventId: "{{inputs.eventId}}", command: "start_recording"}
+    fallback: {simulate: true}
+
+  - id: cue-lower-thirds
+    action: control_graphics
+    using: local
+    params: {cue: "lower_thirds_first_speaker"}
+
+  - id: archive
+    action: upload_assets
+    using: mcp-gdrive
+    params: {eventId: "{{inputs.eventId}}", folder: "Events/{{inputs.eventId}}"}
+    fallback: {simulate: true}
+
+outputs:
+  ros_status:
+    eventId: "{{inputs.eventId}}"
+    preflight_ok: "{{s.preflight_ok}}"
