@@ -30,7 +30,7 @@ _USAGE_HINTS: Dict[str, str] = {
     "recipe:new": "Usage: /recipe new <recipe name>",
     "recipe:attach": "Usage: /recipe attach agent=\"<agent name>\" recipe=\"<recipe name>\"",
     "tool:health": "Usage: /tool health <connector name>",
-    "tool:action": "Usage: /tool action <connector name> {\\"action\\":...}",
+    "tool:action": 'Usage: /tool action <connector name> {"action":...}',
     "sop": "Usage: /sop agent=\"Support\" name=\"Reset Projector\"\\n<Steps...>",
 }
 
