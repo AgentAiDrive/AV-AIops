@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-# Core stores/services
+# Import the shared RunStore helper
 from core.runstore_factory import make_runstore
 from core.db.session import get_session
 from core.workflow.service import list_workflows
@@ -57,7 +57,7 @@ elif win == "30d":
 # Helpers for heterogeneous stores
 # ---------------------------------------------------------------------------
 def _to_dt(value: Any) -> Optional[datetime]:
-    """Parse a variety of datetime representations into a tz-aware UTC datetime."""
+    """Parse various date representations into a tz-aware UTC datetime."""
     if not value:
         return None
     if isinstance(value, datetime):
@@ -70,7 +70,7 @@ def _to_dt(value: Any) -> Optional[datetime]:
 
 
 def _stats_compat(store, *, hours: Optional[int] = None, since: Optional[datetime] = None) -> Dict[str, Any]:
-    """Call store.stats with whatever signature it supports."""
+    """Call store.stats with an available signature."""
     if hours is not None:
         try:
             return store.stats(hours=hours)
@@ -85,25 +85,21 @@ def _stats_compat(store, *, hours: Optional[int] = None, since: Optional[datetim
 
 
 def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Optional[datetime]) -> List[Dict[str, Any]]:
-    """Fetch runs using the first available method and normalize rough filtering."""
-    # Try latest_runs(limit=?, status=?)
+    """Fetch runs from the store using whatever API it supports."""
     try:
         rows = store.latest_runs(limit=limit, status=statuses)
     except Exception:
-        # Try recent(limit=?, hours=?)
         try:
             hours = None
             if since:
                 hours = max(1, int((datetime.now(timezone.utc) - since).total_seconds() // 3600))
             rows = store.recent(limit=limit, hours=hours or 24)
         except Exception:
-            # Try list_runs()
             try:
                 rows = store.list_runs()
             except Exception:
                 rows = []
 
-    # Parse JSON strings if necessary
     out: List[Dict[str, Any]] = []
     for r in rows:
         if isinstance(r, str):
@@ -113,9 +109,9 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
                 continue
         out.append(r)
 
-    # Time-window filter using parsed timestamps (always tz-aware)
+    # Filter by time window using tz-aware comparisons
     if since:
-        filtered: List[Dict[str, Any]] = []
+        filtered = []
         for r in out:
             ts = _to_dt(
                 r.get("started_at")
@@ -124,14 +120,14 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
                 or r.get("ts")
                 or r.get("time")
             ) or datetime.min.replace(tzinfo=timezone.utc)
-            # Ensure tz-aware
+            # Ensure both sides are tz-aware
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if ts >= since:
                 filtered.append(r)
         out = filtered
 
-    # Status mapping if store didn't filter
+    # Filter by status if the store didn't handle it
     def _status_of(rr: Dict[str, Any]) -> str:
         if "status" in rr and rr["status"]:
             return str(rr["status"])
@@ -148,7 +144,7 @@ def _latest_runs_compat(store, *, limit: int, statuses: List[str], since: Option
 
 
 def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
-    """Map heterogeneous run dicts into a common shape for the UI."""
+    """Normalize a run dict into a common shape for display."""
     meta = r.get("meta") or {}
     started = _to_dt(
         r.get("started_at")
@@ -205,6 +201,7 @@ def _normalize_run(r: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _run_details_compat(store, run_id: Any) -> Dict[str, Any]:
+    """Fetch detailed run data from the store, with fallback."""
     try:
         return store.run_details(run_id)
     except Exception:
@@ -229,6 +226,7 @@ if p95_ms is None:
     p95_ms = (float(p95_s) * 1000.0) if p95_s is not None else 0.0
 last_error = stats.get("last_error") or ""
 
+# Display KPI metrics
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Runs", f"{runs_total}")
 c2.metric("Success rate", f"{success_rate:.1f}%")
@@ -241,7 +239,7 @@ c4.metric("Last error", last_error or "—")
 rows_raw = _latest_runs_compat(store, limit=200, statuses=statuses, since=since)
 rows = [_normalize_run(r) for r in rows_raw]
 
-# Drop rows that still lack a timestamp; avoids pandas sorting errors
+# Drop runs with no timestamp to avoid pandas sort errors
 rows = [r for r in rows if r["started_at"] is not None]
 
 if not rows:
@@ -323,6 +321,7 @@ try:
 except (TypeError, ValueError):
     selected_id_int = selected_id
 
+# Reset pagination for new selection
 if st.session_state.get("current_detail_id") != selected_id_int:
     st.session_state["current_detail_id"] = selected_id_int
     st.session_state[f"steps_page_{selected_id_int}"] = 1
@@ -343,7 +342,7 @@ with left:
     st.markdown(f"**{title}** &nbsp;•&nbsp; #{selected_id_int}")
     st.caption(f"Agent={agent_id} · Recipe={recipe_id} · Status={status} · Duration={int(duration_ms)} ms")
 
-    # NOTE: st.page_link doesn't support page_args — use direct querystring
+    # Use direct URL (page_link doesn’t support page_args)
     detail_url = f"/Run_Detail?run_id={selected_id_int}"
     st.page_link(detail_url, label="Open full run details", icon="🔎")
 
@@ -373,7 +372,6 @@ with left:
         step_end = min(step_start + step_page_size, step_total)
         st.caption(f"Showing steps {step_start + 1}-{step_end} of {step_total}.")
         for s in steps[step_start:step_end]:
-            level = s.get("level") or "info"
             phase = s.get("phase") or "—"
             msg = s.get("message") or s.get("msg") or "—"
             stts = s.get("status") or "—"
@@ -424,15 +422,14 @@ with right:
                     st.json(a["data"])
 
 # ---------------------------------------------------------------------------
-# Workflows panel (from SQLAlchemy DB)
+# Workflows panel (for reference)
 # ---------------------------------------------------------------------------
 st.subheader("Workflows")
-with get_session() as db:  # type: ignore
+with get_session() as db:
     wfs = list_workflows(db)
     if not wfs:
         st.info("No workflows defined yet.")
     for wf in wfs:
-        # Optional color from compute_status if desired
         from core.workflow.service import compute_status
         status = compute_status(wf)
         dot = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(status, "⚪")
