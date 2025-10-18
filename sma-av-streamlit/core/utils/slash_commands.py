@@ -26,12 +26,12 @@ class SlashCommand:
 
 
 _USAGE_HINTS: Dict[str, str] = {
-    "agent:run": "Usage: /agent run <agent name> recipe=\"<recipe name>\"",
-    "recipe:new": "Usage: /recipe new <recipe name>",
-    "recipe:attach": "Usage: /recipe attach agent=\"<agent name>\" recipe=\"<recipe name>\"",
-    "tool:health": "Usage: /tool health <connector name>",
+    "agent:run":   'Usage: /agent run <agent name> recipe="<recipe name>"',
+    "recipe:new":  'Usage: /recipe new <recipe name>',
+    "recipe:attach": 'Usage: /recipe attach agent="<agent name>" recipe="<recipe name>"',
+    "tool:health": 'Usage: /tool health <connector name>',
     "tool:action": 'Usage: /tool action <connector name> {"action":...}',
-    "sop": "Usage: /sop agent=\"Support\" name=\"Reset Projector\"\\n<Steps...>",
+    "sop":         'Usage: /sop agent="Support" name="Reset Projector"\n<Steps...>',
 }
 
 
