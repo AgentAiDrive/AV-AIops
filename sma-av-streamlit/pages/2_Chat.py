@@ -36,7 +36,6 @@ __all__ = [
 PAGE_KEY = "Chat"  # identifies this page in the page tips helper
 show_tip(PAGE_KEY)
 
-st.set_page_config(page_title="Chat", page_icon="💬", layout="wide")
 st.title("💬 Chat")
 
 # --- Sidebar helpers ---------------------------------------------------------
