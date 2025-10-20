@@ -17,7 +17,21 @@ model_light()
 
 st.success("Database initialized.")
 
+try:
+    from core.ui.page_tips import PAGE_TIPS  # type: ignore
+except Exception:
+    PAGE_TIPS = {
+        "Setup Wizard": "Initialize DB, seed demo agents/tools/recipes, and sample workflows. Safe to run multiple times.",
+        "Settings": "Choose active LLM (OpenAI↔Anthropic) for Chat/recipes/SOPs. Indicator shows which model is active.",
+        "Chat": "Slash commands to generate SOPs → Recipes → Run. Toggle JSON mode for raw payloads.",
+        "Agents": "Create agents, choose a recipe, trigger a run. Results appear in Dashboard → Runs.",
+        "Recipes": "Author YAML recipes in IPAV format; validate, version, and save to the library.",
+        "MCP Tools": "Discover local connectors (slack/zoom/servicenow). Check `/health` and call `/action` with JSON body.",
+        "Workflows": "Wire Agent + Recipe + Trigger (manual/interval). Every run records IPAV steps & artifacts.",
+        "Dashboard": "KPIs (runs, success %, p95 duration), trends, and run details (steps + artifacts).",
+    }
 
+st.title("❓ Help & Runbook")
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
     """Walk up from this file to find the app root (where app.py / core / pages live)."""
