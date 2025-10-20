@@ -6,6 +6,7 @@ from core.db.session import get_session
 from core.db.models import Agent, Recipe
 from core.workflow.engine import execute_recipe_run
 
+st.set_page_config(page_title="Agents", page_icon="🤖", layout="wide")
 st.title("🤖 Agents")
 
 st.markdown(
