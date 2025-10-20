@@ -1,6 +1,6 @@
-import streamlit as st
 from __future__ import annotations
 import re
+import streamlit as st
 from pathlib import Path
 from core.db.seed import init_db
 
