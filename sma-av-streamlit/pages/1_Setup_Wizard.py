@@ -1,11 +1,9 @@
-
 import streamlit as st
+import streamlit.components.v1 as components
 from core.db.seed import seed_demo
-# paste this at the top of any page
-import streamlit as st
 from core.ui.page_tips import show as show_tip
 
-PAGE_KEY = "Setup Wizard"  # <= change per page: "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
+PAGE_KEY = "Setup Wizard"  # "Setup Wizard" | "Settings" | "Chat" | "Agents" | "Recipes" | "MCP Tools" | "Workflows" | "Dashboard"
 show_tip(PAGE_KEY)
 
 st.title("🏁 Setup Wizard")
@@ -14,3 +12,414 @@ st.write("Initialize database, seed demo agents, tools, and recipes.")
 if st.button("Initialize database & seed demo data"):
     seed_demo()
     st.success("Seed complete.")
+
+st.divider()
+st.header("📊 Value Intake & License Optimization Form")
+
+form_html = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>AV Ops Value Intake</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b0c10;
+      --panel:#111318;
+      --muted:#98a2b3;
+      --border:#1f242d;
+      --text:#e6eaf2;
+      --accent:#66d9e8;
+      --accent-2:#b197fc;
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, #1b2333 0%, #0b0c10 55%) fixed;
+      color: var(--text);
+      line-height:1.45;
+    }
+    .wrap{max-width:1080px;margin:8px auto 24px;padding:0 16px;}
+    .title{display:flex;align-items:center;gap:14px;margin:0 0 12px 0;font-weight:800;letter-spacing:.2px;}
+    .title .pill{font-size:12px;color:#0b0c10;background:var(--accent);border-radius:999px;padding:4px 10px;font-weight:700;}
+    .card{background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));border:1px solid var(--border);border-radius: var(--radius);box-shadow: var(--shadow);padding:22px;}
+    .grid{display:grid;gap:16px}
+    @media (min-width:820px){ .grid.two{grid-template-columns:1fr 1fr} .grid.three{grid-template-columns:1fr 1fr 1fr} }
+    h2{font-size:18px;margin:12px 0 6px 0}
+    fieldset{border:1px dashed var(--border);border-radius:12px;padding:14px;margin:0}
+    legend{padding:0 8px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+    label{display:block;font-size:14px;margin-bottom:6px}
+    .row{display:grid;gap:8px}
+    .hint{color:var(--muted);font-size:12px}
+    input[type="number"], input[type="text"], select{
+      width:100%;background:#0c111b;border:1px solid var(--border);
+      color:var(--text);border-radius:10px;padding:10px 12px;outline:none;
+    }
+    input[type="number"]:focus, input[type="text"]:focus, select:focus{border-color:var(--accent)}
+    .seg{display:flex;background:#0c111b;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .seg input{display:none}
+    .seg label{flex:1;text-align:center;padding:10px;cursor:pointer;font-size:14px;border-right:1px solid var(--border);}
+    .seg label:last-child{border-right:none}
+    .seg input:checked + label{background:linear-gradient(180deg,#102235,#0c111b);color:var(--accent);font-weight:700}
+    .inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .checkbox-row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:10px;border:1px solid var(--border);border-radius:10px;background:#0c111b;}
+    .mini-grid{display:grid;gap:8px}
+    @media (min-width:720px){ .mini-grid{grid-template-columns:repeat(3, minmax(0,1fr));} }
+    .totals{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--muted)}
+    .pill-num{background:#121826;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:1px solid var(--border);background:#121826;color:var(--text);border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;}
+    button.primary{background:linear-gradient(180deg,#1a2a40,#111a29);border-color:#1b2a42}
+    button.primary:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(102,217,232,.15) inset}
+    .success{color:var(--good)} .warn{color:var(--warn)}
+    .out{margin-top:18px;background:#0c111b;border:1px solid var(--border);border-radius:12px;padding:12px}
+    textarea{width:100%;min-height:160px;background:transparent;border:none;color:var(--text);resize:vertical;font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}
+    .small{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title">
+      <span class="pill">Intake</span> AV Ops Value & License Optimization — Data Capture
+    </h1>
+    <p class="hint" style="margin:0 0 20px 0;">
+      Provide typical ranges; estimates are fine. On submit, you’ll get a JSON payload ready for modeling.
+    </p>
+
+    <form id="intake" class="grid" novalidate>
+      <div class="card">
+        <h2>Meeting Volume</h2>
+        <div class="row">
+          <fieldset>
+            <legend>Average meetings input mode</legend>
+            <div class="seg" role="tablist" aria-label="Meetings input mode">
+              <input type="radio" id="mode_room_day" name="meet_mode" value="per_room_per_day" checked>
+              <label for="mode_room_day">Per room • per day</label>
+              <input type="radio" id="mode_ent_month" name="meet_mode" value="enterprise_per_month">
+              <label for="mode_ent_month">Enterprise • per month</label>
+            </div>
+            <div id="perRoom" class="grid two" style="margin-top:12px;">
+              <div>
+                <label for="mtgs_per_room_day">Avg meetings / room / day</label>
+                <input id="mtgs_per_room_day" type="number" min="0" step="0.1" placeholder="e.g., 5.0" inputmode="decimal">
+                <div class="hint">If uncertain, 3–8 is common depending on culture & space type.</div>
+              </div>
+              <div>
+                <label for="rooms_count">Rooms in scope</label>
+                <input id="rooms_count" type="number" min="0" step="1" placeholder="e.g., 500" inputmode="numeric" value="500">
+                <div class="hint">Your example environment uses 500 rooms; adjust if needed.</div>
+              </div>
+            </div>
+            <div id="enterpriseMonthly" class="grid two" style="display:none;margin-top:12px;">
+              <div>
+                <label for="mtgs_enterprise_month">Total meetings / month (enterprise)</label>
+                <input id="mtgs_enterprise_month" type="number" min="0" step="1" placeholder="e.g., 80,000" inputmode="numeric">
+              </div>
+              <div>
+                <label for="employees_count">Employees in scope</label>
+                <input id="employees_count" type="number" min="0" step="1" placeholder="e.g., 10000" inputmode="numeric" value="10000">
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="grid two" style="margin-top:12px;">
+            <div>
+              <label for="avg_attendees">Average attendee count per meeting</label>
+              <input id="avg_attendees" type="number" min="1" step="1" placeholder="e.g., 6" inputmode="numeric">
+            </div>
+            <div>
+              <label for="loaded_cost_hour">Average loaded cost per hour per employee (USD)</label>
+              <input id="loaded_cost_hour" type="number" min="0" step="1" placeholder="e.g., 85" inputmode="decimal">
+              <div class="hint">Fully-loaded: salary + benefits + overhead (estimate is fine).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Support Incidents</h2>
+        <fieldset class="row">
+          <legend>Incidents input mode</legend>
+          <div class="seg" role="tablist" aria-label="Incidents input mode">
+            <input type="radio" id="inc_mode_room" name="inc_mode" value="per_room" checked>
+            <label for="inc_mode_room">Per room • per month</label>
+            <input type="radio" id="inc_mode_ent" name="inc_mode" value="enterprise">
+            <label for="inc_mode_ent">Enterprise • per month</label>
+          </div>
+
+          <div id="incPerRoom" class="grid two" style="margin-top:12px;">
+            <div>
+              <label for="incidents_per_room_month">Estimated incidents / room / month</label>
+              <input id="incidents_per_room_month" type="number" min="0" step="0.1" placeholder="e.g., 0.3" inputmode="decimal">
+            </div>
+            <div>
+              <label for="rooms_count_inc">Rooms in scope</label>
+              <input id="rooms_count_inc" type="number" min="0" step="1" placeholder="e.g., 500" inputmode="numeric" value="500">
+            </div>
+          </div>
+
+          <div id="incEnterprise" class="grid two" style="display:none;margin-top:12px;">
+            <div>
+              <label for="incidents_enterprise_month">Estimated incidents / month (enterprise)</label>
+              <input id="incidents_enterprise_month" type="number" min="0" step="1" placeholder="e.g., 150" inputmode="numeric">
+            </div>
+            <div>
+              <label for="rooms_count_inc_ro">Rooms in scope</label>
+              <input id="rooms_count_inc_ro" type="number" min="0" step="1" placeholder="e.g., 500" inputmode="numeric" value="500">
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="card">
+        <h2>Hours of Operation</h2>
+        <fieldset>
+          <legend>Select one</legend>
+          <div class="inline" role="radiogroup" aria-label="Hours of operation">
+            <label><input type="radio" name="hours" value="9-5 weekdays" checked> 9–5 (Weekdays)</label>
+            <label><input type="radio" name="hours" value="7-7 weekdays"> 7–7 (Weekdays)</label>
+            <label><input type="radio" name="hours" value="24x5"> 24×5 (Mon–Fri)</label>
+            <label><input type="radio" name="hours" value="24x7"> 24×7</label>
+            <label class="inline">
+              <input type="radio" name="hours" value="custom" id="hours_custom_radio"> Custom
+              <input type="text" id="hours_custom" placeholder="e.g., 6–8 (Mon–Sat)" style="display:none;max-width:260px">
+            </label>
+          </div>
+          <div class="hint" style="margin-top:8px;">Choose the closest fit; you can describe specifics via “Custom”.</div>
+        </fieldset>
+      </div>
+
+      <div class="card">
+        <h2>License Optimization Candidates</h2>
+        <p class="hint" style="margin-top:-4px">
+          Check platforms you hold licenses for, enter counts, and (optionally) typical monthly cost & underuse %. We’ll preview potential monthly savings.
+        </p>
+
+        <div id="platforms" class="grid" style="margin-top:10px;"></div>
+
+        <div class="btns" style="margin-top:10px;">
+          <button type="button" id="addPlatform">+ Add custom platform</button>
+        </div>
+
+        <div class="totals">
+          <span class="pill-num" id="selPlatforms">0 platforms selected</span>
+          <span class="pill-num">Est. reclaimable (monthly): <strong id="savingsPreview">$0</strong></span>
+          <span class="small">Savings = Σ (licenses × cost × underuse%)</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Finish</h2>
+        <div class="btns">
+          <button type="submit" class="primary">Generate JSON</button>
+          <button type="button" id="copyJson">Copy JSON</button>
+          <span id="copyState" class="small"></span>
+        </div>
+        <div class="out"><textarea id="jsonOut" placeholder="// JSON payload appears here…" readonly></textarea></div>
+        <div class="small">Tip: Paste this JSON into your modeling step for the 500 rooms / 10,000 employees scenario (Zoom + Q-SYS + Crestron + Logitech).</div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const $ = (sel, root=document)=>root.querySelector(sel);
+    const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
+    const money = n => isFinite(n) ? n.toLocaleString(undefined, {style:'currency', currency:'USD', maximumFractionDigits:0}) : '$0';
+
+    const modeRadios = $$('input[name="meet_mode"]');
+    const perRoom = $('#perRoom'); const entMonthly = $('#enterpriseMonthly');
+    modeRadios.forEach(r=>r.addEventListener('change',()=>{
+      const room = $('input[name="meet_mode"]:checked').value === 'per_room_per_day';
+      perRoom.style.display = room ? '' : 'none';
+      entMonthly.style.display = room ? 'none' : '';
+    }));
+
+    const incModeRadios = $$('input[name="inc_mode"]');
+    const incPerRoom = $('#incPerRoom'); const incEnterprise = $('#incEnterprise');
+    incModeRadios.forEach(r=>r.addEventListener('change',()=>{
+      const room = $('input[name="inc_mode"]:checked').value === 'per_room';
+      incPerRoom.style.display = room ? '' : 'none';
+      incEnterprise.style.display = room ? 'none' : '';
+    }));
+
+    const hoursCustomRadio = $('#hours_custom_radio');
+    const hoursCustom = $('#hours_custom');
+    $$('input[name="hours"]').forEach(r=>{
+      r.addEventListener('change',()=>{
+        hoursCustom.style.display = hoursCustomRadio.checked ? '' : 'none';
+      });
+    });
+
+    const defaultPlatforms = [
+      { key:'zoom_meetings', label:'Zoom Meetings' },
+      { key:'zoom_rooms',    label:'Zoom Rooms' },
+      { key:'zoom_webinar',  label:'Zoom Webinar' },
+      { key:'zoom_phone',    label:'Zoom Phone' },
+      { key:'microsoft_teams', label:'Microsoft Teams (E/M add-ons)' },
+      { key:'webex_meetings',  label:'Webex Meetings' },
+      { key:'webex_calling',   label:'Webex Calling' },
+      { key:'google_meet',     label:'Google Meet add-ons' }
+    ];
+
+    const platRoot = $('#platforms');
+
+    function platformRow(p){
+      const id = `plat_${p.key}_${Math.random().toString(36).slice(2,7)}`;
+      const row = document.createElement('div');
+      row.className='checkbox-row';
+      row.innerHTML = \`
+        <div>
+          <input id="\${id}" type="checkbox" aria-describedby="\${id}_hint">
+        </div>
+        <div>
+          <label for="\${id}" style="font-weight:700">\${p.label}</label>
+          <div class="mini-grid">
+            <div class="row">
+              <label>Licenses</label>
+              <input type="number" min="0" step="1" placeholder="e.g., 120" inputmode="numeric" class="fld-qty" disabled>
+            </div>
+            <div class="row">
+              <label>Monthly cost / license (USD)</label>
+              <input type="number" min="0" step="1" placeholder="optional" inputmode="decimal" class="fld-cost" disabled>
+            </div>
+            <div class="row">
+              <label>Underuse % (reclaimable)</label>
+              <input type="number" min="0" max="100" step="1" placeholder="optional" inputmode="numeric" class="fld-underuse" disabled>
+            </div>
+          </div>
+          <div class="hint" id="\${id}_hint">Check to include • you can add counts & optional cost/underuse % to preview savings.</div>
+        </div>\`;
+      const cb = $('input[type="checkbox"]', row);
+      const inputs = $$('.mini-grid input', row);
+      cb.addEventListener('change',()=>{
+        inputs.forEach(i => i.disabled = !cb.checked);
+        updateSavings();
+      });
+      inputs.forEach(i=>i.addEventListener('input', updateSavings));
+      row.dataset.platKey = p.key;
+      row.dataset.platLabel = p.label;
+      platRoot.appendChild(row);
+    }
+
+    defaultPlatforms.forEach(platformRow);
+
+    $('#addPlatform').addEventListener('click', ()=>{
+      const name = prompt('Custom platform name (e.g., “BlueJeans Events”)');
+      if(!name) return;
+      platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
+    });
+
+    function updateSavings(){
+      const rows = $$('.checkbox-row', platRoot);
+      let selected = 0, savings = 0;
+      rows.forEach(r=>{
+        const checked = $('input[type="checkbox"]', r).checked;
+        if(!checked) return;
+        selected++;
+        const qty = parseFloat($('.fld-qty', r).value) || 0;
+        const cost = parseFloat($('.fld-cost', r).value) || 0;
+        const under = Math.min(100, Math.max(0, parseFloat($('.fld-underuse', r).value) || 0));
+        savings += qty * cost * (under/100);
+      });
+      $('#selPlatforms').textContent = \`\${selected} platform\${selected!==1?'s':''} selected\`;
+      $('#savingsPreview').textContent = money(savings);
+    }
+
+    function valNum(sel){ const el = document.querySelector(sel); const v = parseFloat(el && el.value); return isFinite(v) ? v : null; }
+
+    $('#intake').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const payload = {
+        meeting_volume: (()=> {
+          const mode = document.querySelector('input[name="meet_mode"]:checked').value;
+          if(mode === 'per_room_per_day'){
+            return {
+              mode,
+              avg_meetings_per_room_per_day: valNum('#mtgs_per_room_day'),
+              rooms_count: valNum('#rooms_count')
+            };
+          } else {
+            return {
+              mode,
+              meetings_enterprise_per_month: valNum('#mtgs_enterprise_month'),
+              employees_count: valNum('#employees_count')
+            };
+          }
+        })(),
+        avg_attendees_per_meeting: valNum('#avg_attendees'),
+        loaded_cost_per_hour_usd: valNum('#loaded_cost_hour'),
+        support_incidents: (()=> {
+          const mode = document.querySelector('input[name="inc_mode"]:checked').value;
+          if(mode === 'per_room'){
+            return {
+              mode,
+              incidents_per_room_per_month: valNum('#incidents_per_room_month'),
+              rooms_count: valNum('#rooms_count_inc')
+            };
+          } else {
+            return {
+              mode,
+              incidents_enterprise_per_month: valNum('#incidents_enterprise_month'),
+              rooms_count_reference: valNum('#rooms_count_inc_ro')
+            };
+          }
+        })(),
+        hours_of_operation: (()=> {
+          const sel = document.querySelector('input[name="hours"]:checked').value;
+          return sel === 'custom' ? (document.querySelector('#hours_custom').value || 'custom') : sel;
+        })(),
+        license_optimization: (()=> {
+          const rows = Array.from(document.querySelectorAll('.checkbox-row', platRoot));
+          const selected = [];
+          rows.forEach(r=>{
+            const cb = r.querySelector('input[type="checkbox"]');
+            if(!cb.checked) return;
+            selected.push({
+              key: r.dataset.platKey,
+              label: r.dataset.platLabel,
+              licenses: parseFloat(r.querySelector('.fld-qty').value) || 0,
+              monthly_cost_per_license_usd: parseFloat(r.querySelector('.fld-cost').value) || null,
+              underuse_percent: parseFloat(r.querySelector('.fld-underuse').value) || null
+            });
+          });
+          const est_monthly_savings = selected.reduce((acc, p)=>{
+            const qty = p.licenses || 0;
+            const cost = p.monthly_cost_per_license_usd || 0;
+            const under = Math.min(100, Math.max(0, p.underuse_percent || 0));
+            return acc + qty * cost * (under/100);
+          }, 0);
+          return { selected, est_monthly_savings };
+        })(),
+        environment_defaults: { rooms: 500, employees: 10000, stacks: ["Zoom", "Q-SYS", "Crestron", "Logitech"] },
+        meta: { generated_at: new Date().toISOString(), schema_version: "1.0.0" }
+      };
+      document.querySelector('#jsonOut').value = JSON.stringify(payload, null, 2);
+      updateSavings();
+    });
+
+    document.querySelector('#copyJson').addEventListener('click', async ()=>{
+      const txt = document.querySelector('#jsonOut').value.trim();
+      const copyState = document.querySelector('#copyState');
+      if(!txt){ copyState.textContent = 'Nothing to copy yet—click “Generate JSON” first.'; return; }
+      try{
+        await navigator.clipboard.writeText(txt);
+        copyState.textContent = 'Copied ✓';
+        copyState.className = 'small success';
+        setTimeout(()=>{copyState.textContent='';}, 2000);
+      }catch{
+        copyState.textContent = 'Copy failed — select & copy manually.';
+        copyState.className = 'small warn';
+      }
+    });
+  </script>
+</body>
+</html>"""
+
+# Render the form in an iframe; adjust height to taste
+components.html(form_html, height=1750, scrolling=True)
