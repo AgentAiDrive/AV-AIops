@@ -18,8 +18,7 @@ import streamlit as st
 
 from core.runstore_factory import make_runstore
 
-
-st.set_page_config(page_title="Run Details", layout="wide")
+st.set_page_config(page_title="Run Details", page_icon="🔎", layout="wide")
 st.title("🔎 Run Details")
 
 # Extract run_id from query parameters
