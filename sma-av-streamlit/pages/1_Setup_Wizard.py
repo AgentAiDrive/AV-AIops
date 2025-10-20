@@ -14,7 +14,7 @@ if st.button("Initialize database & seed demo data"):
     st.success("Seed complete.")
 
 st.divider()
-st.header("📊 Value Intake & License Optimization Form")
+st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 
 form_html = """<!doctype html>
 <html lang="en">
@@ -24,31 +24,15 @@ form_html = """<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --bg:#0b0c10;
-      --panel:#111318;
-      --muted:#98a2b3;
-      --border:#1f242d;
-      --text:#e6eaf2;
-      --accent:#66d9e8;
-      --accent-2:#b197fc;
-      --good:#22c55e;
-      --warn:#f59e0b;
-      --bad:#ef4444;
-      --shadow: 0 10px 25px rgba(0,0,0,.35);
-      --radius: 16px;
+      --bg:#0b0c10; --panel:#111318; --muted:#98a2b3; --border:#1f242d;
+      --text:#e6eaf2; --accent:#66d9e8; --good:#22c55e; --warn:#f59e0b; --shadow:0 10px 25px rgba(0,0,0,.35); --radius:16px;
     }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: radial-gradient(1200px 800px at 20% -10%, #1b2333 0%, #0b0c10 55%) fixed;
-      color: var(--text);
-      line-height:1.45;
-    }
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:radial-gradient(1200px 800px at 20% -10%, #1b2333 0%, #0b0c10 55%) fixed;color:var(--text);line-height:1.45;}
     .wrap{max-width:1080px;margin:8px auto 24px;padding:0 16px;}
     .title{display:flex;align-items:center;gap:14px;margin:0 0 12px 0;font-weight:800;letter-spacing:.2px;}
     .title .pill{font-size:12px;color:#0b0c10;background:var(--accent);border-radius:999px;padding:4px 10px;font-weight:700;}
-    .card{background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));border:1px solid var(--border);border-radius: var(--radius);box-shadow: var(--shadow);padding:22px;}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;}
     .grid{display:grid;gap:16px}
     @media (min-width:820px){ .grid.two{grid-template-columns:1fr 1fr} .grid.three{grid-template-columns:1fr 1fr 1fr} }
     h2{font-size:18px;margin:12px 0 6px 0}
@@ -57,10 +41,7 @@ form_html = """<!doctype html>
     label{display:block;font-size:14px;margin-bottom:6px}
     .row{display:grid;gap:8px}
     .hint{color:var(--muted);font-size:12px}
-    input[type="number"], input[type="text"], select{
-      width:100%;background:#0c111b;border:1px solid var(--border);
-      color:var(--text);border-radius:10px;padding:10px 12px;outline:none;
-    }
+    input[type="number"], input[type="text"], select{width:100%;background:#0c111b;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;outline:none;}
     input[type="number"]:focus, input[type="text"]:focus, select:focus{border-color:var(--accent)}
     .seg{display:flex;background:#0c111b;border:1px solid var(--border);border-radius:10px;overflow:hidden}
     .seg input{display:none}
@@ -79,20 +60,19 @@ form_html = """<!doctype html>
     button.primary:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(102,217,232,.15) inset}
     .success{color:var(--good)} .warn{color:var(--warn)}
     .out{margin-top:18px;background:#0c111b;border:1px solid var(--border);border-radius:12px;padding:12px}
-    textarea{width:100%;min-height:160px;background:transparent;border:none;color:var(--text);resize:vertical;font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}
+    textarea{width:100%;min-height:160px;background:transparent;border:none;color:var(--text);resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;}
     .small{font-size:12px;color:var(--muted)}
+    details{background:#0c111b;border:1px solid var(--border);border-radius:12px;padding:12px}
+    summary{cursor:pointer;font-weight:700;margin-bottom:8px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1 class="title">
-      <span class="pill">Intake</span> AV Ops Value & License Optimization — Data Capture
-    </h1>
-    <p class="hint" style="margin:0 0 20px 0;">
-      Provide typical ranges; estimates are fine. On submit, you’ll get a JSON payload ready for modeling.
-    </p>
+    <h1 class="title"><span class="pill">Intake</span> AV Ops Value & License Optimization — Data Capture</h1>
+    <p class="hint" style="margin:0 0 20px 0;">Provide typical ranges; estimates are fine. Then export as SOP JSON and/or IPAV Recipe YAML.</p>
 
     <form id="intake" class="grid" novalidate>
+      <!-- MEETING VOLUME -->
       <div class="card">
         <h2>Meeting Volume</h2>
         <div class="row">
@@ -119,7 +99,7 @@ form_html = """<!doctype html>
             <div id="enterpriseMonthly" class="grid two" style="display:none;margin-top:12px;">
               <div>
                 <label for="mtgs_enterprise_month">Total meetings / month (enterprise)</label>
-                <input id="mtgs_enterprise_month" type="number" min="0" step="1" placeholder="e.g., 80,000" inputmode="numeric">
+                <input id="mtgs_enterprise_month" type="number" min="0" step="1" placeholder="e.g., 80000" inputmode="numeric">
               </div>
               <div>
                 <label for="employees_count">Employees in scope</label>
@@ -142,6 +122,7 @@ form_html = """<!doctype html>
         </div>
       </div>
 
+      <!-- SUPPORT INCIDENTS -->
       <div class="card">
         <h2>Support Incidents</h2>
         <fieldset class="row">
@@ -177,6 +158,7 @@ form_html = """<!doctype html>
         </fieldset>
       </div>
 
+      <!-- HOURS OF OPERATION -->
       <div class="card">
         <h2>Hours of Operation</h2>
         <fieldset>
@@ -195,18 +177,14 @@ form_html = """<!doctype html>
         </fieldset>
       </div>
 
+      <!-- LICENSE OPTIMIZATION -->
       <div class="card">
         <h2>License Optimization Candidates</h2>
-        <p class="hint" style="margin-top:-4px">
-          Check platforms you hold licenses for, enter counts, and (optionally) typical monthly cost & underuse %. We’ll preview potential monthly savings.
-        </p>
-
+        <p class="hint" style="margin-top:-4px">Check platforms and (optionally) cost & underuse % for savings preview.</p>
         <div id="platforms" class="grid" style="margin-top:10px;"></div>
-
         <div class="btns" style="margin-top:10px;">
           <button type="button" id="addPlatform">+ Add custom platform</button>
         </div>
-
         <div class="totals">
           <span class="pill-num" id="selPlatforms">0 platforms selected</span>
           <span class="pill-num">Est. reclaimable (monthly): <strong id="savingsPreview">$0</strong></span>
@@ -214,15 +192,36 @@ form_html = """<!doctype html>
         </div>
       </div>
 
+      <!-- IMPLEMENTATION HOW-TO (shown in SOP too) -->
+      <div class="card">
+        <h2>How to Implement in the IPAV App</h2>
+        <details open>
+          <summary>Step-by-step</summary>
+          <ol class="hint">
+            <li>Click <strong>Generate</strong> → <strong>Download SOP JSON</strong>.</li>
+            <li>Open <em>Chat</em> in the Streamlit app and paste the JSON with <code>/sop</code>.</li>
+            <li>Review the generated <strong>Recipe YAML</strong>, then save it in <em>Recipes</em>.</li>
+            <li>Attach the recipe to an agent in <em>Agents</em>.</li>
+            <li>Create a <em>Workflow</em> “Baseline Capture” using that agent + recipe; run it.</li>
+            <li>Verify evidence and metrics in <em>Dashboard</em> and schedule periodic runs.</li>
+          </ol>
+        </details>
+      </div>
+
+      <!-- ACTIONS -->
       <div class="card">
         <h2>Finish</h2>
-        <div class="btns">
-          <button type="submit" class="primary">Generate JSON</button>
+        <div class="btns" style="margin-bottom:10px;">
+          <button type="submit" class="primary">Generate (Preview JSON & YAML)</button>
           <button type="button" id="copyJson">Copy JSON</button>
+          <button type="button" id="downloadSop">Download SOP JSON</button>
+          <button type="button" id="copyYaml">Copy YAML</button>
+          <button type="button" id="downloadYaml">Download IPAV Recipe YAML</button>
           <span id="copyState" class="small"></span>
         </div>
-        <div class="out"><textarea id="jsonOut" placeholder="// JSON payload appears here…" readonly></textarea></div>
-        <div class="small">Tip: Paste this JSON into your modeling step for the 500 rooms / 10,000 employees scenario (Zoom + Q-SYS + Crestron + Logitech).</div>
+        <div class="out"><textarea id="jsonOut" placeholder="// SOP JSON preview…" readonly></textarea></div>
+        <div class="out"><textarea id="yamlOut" placeholder="# IPAV Recipe YAML preview…" readonly></textarea></div>
+        <div class="small">Tip: Paste SOP JSON into Chat with <code>/sop</code> to regenerate the YAML in-app, or import the YAML directly.</div>
       </div>
     </form>
   </div>
@@ -230,8 +229,9 @@ form_html = """<!doctype html>
   <script>
     const $ = (sel, root=document)=>root.querySelector(sel);
     const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
-    const money = n => isFinite(n) ? n.toLocaleString(undefined, {style:'currency', currency:'USD', maximumFractionDigits:0}) : '$0';
+    const money = n => isFinite(n) ? n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0}) : '$0';
 
+    // --- toggles
     const modeRadios = $$('input[name="meet_mode"]');
     const perRoom = $('#perRoom'); const entMonthly = $('#enterpriseMonthly');
     modeRadios.forEach(r=>r.addEventListener('change',()=>{
@@ -239,7 +239,6 @@ form_html = """<!doctype html>
       perRoom.style.display = room ? '' : 'none';
       entMonthly.style.display = room ? 'none' : '';
     }));
-
     const incModeRadios = $$('input[name="inc_mode"]');
     const incPerRoom = $('#incPerRoom'); const incEnterprise = $('#incEnterprise');
     incModeRadios.forEach(r=>r.addEventListener('change',()=>{
@@ -247,15 +246,13 @@ form_html = """<!doctype html>
       incPerRoom.style.display = room ? '' : 'none';
       incEnterprise.style.display = room ? 'none' : '';
     }));
-
     const hoursCustomRadio = $('#hours_custom_radio');
     const hoursCustom = $('#hours_custom');
     $$('input[name="hours"]').forEach(r=>{
-      r.addEventListener('change',()=>{
-        hoursCustom.style.display = hoursCustomRadio.checked ? '' : 'none';
-      });
+      r.addEventListener('change',()=>{ hoursCustom.style.display = hoursCustomRadio.checked ? '' : 'none'; });
     });
 
+    // --- platforms
     const defaultPlatforms = [
       { key:'zoom_meetings', label:'Zoom Meetings' },
       { key:'zoom_rooms',    label:'Zoom Rooms' },
@@ -266,160 +263,384 @@ form_html = """<!doctype html>
       { key:'webex_calling',   label:'Webex Calling' },
       { key:'google_meet',     label:'Google Meet add-ons' }
     ];
-
     const platRoot = $('#platforms');
 
     function platformRow(p){
       const id = `plat_${p.key}_${Math.random().toString(36).slice(2,7)}`;
       const row = document.createElement('div');
       row.className='checkbox-row';
-      row.innerHTML = \`
+      row.innerHTML = `
+        <div><input id="${id}" type="checkbox" aria-describedby="${id}_hint"></div>
         <div>
-          <input id="\${id}" type="checkbox" aria-describedby="\${id}_hint">
-        </div>
-        <div>
-          <label for="\${id}" style="font-weight:700">\${p.label}</label>
+          <label for="${id}" style="font-weight:700">${p.label}</label>
           <div class="mini-grid">
-            <div class="row">
-              <label>Licenses</label>
-              <input type="number" min="0" step="1" placeholder="e.g., 120" inputmode="numeric" class="fld-qty" disabled>
-            </div>
-            <div class="row">
-              <label>Monthly cost / license (USD)</label>
-              <input type="number" min="0" step="1" placeholder="optional" inputmode="decimal" class="fld-cost" disabled>
-            </div>
-            <div class="row">
-              <label>Underuse % (reclaimable)</label>
-              <input type="number" min="0" max="100" step="1" placeholder="optional" inputmode="numeric" class="fld-underuse" disabled>
-            </div>
+            <div class="row"><label>Licenses</label><input type="number" min="0" step="1" placeholder="e.g., 120" inputmode="numeric" class="fld-qty" disabled></div>
+            <div class="row"><label>Monthly cost / license (USD)</label><input type="number" min="0" step="1" placeholder="optional" inputmode="decimal" class="fld-cost" disabled></div>
+            <div class="row"><label>Underuse % (reclaimable)</label><input type="number" min="0" max="100" step="1" placeholder="optional" inputmode="numeric" class="fld-underuse" disabled></div>
           </div>
-          <div class="hint" id="\${id}_hint">Check to include • you can add counts & optional cost/underuse % to preview savings.</div>
-        </div>\`;
+          <div class="hint" id="${id}_hint">Check to include • add counts & optional cost/underuse % to preview savings.</div>
+        </div>`;
       const cb = $('input[type="checkbox"]', row);
       const inputs = $$('.mini-grid input', row);
-      cb.addEventListener('change',()=>{
-        inputs.forEach(i => i.disabled = !cb.checked);
-        updateSavings();
-      });
+      cb.addEventListener('change',()=>{ inputs.forEach(i => i.disabled = !cb.checked); updateSavings(); });
       inputs.forEach(i=>i.addEventListener('input', updateSavings));
       row.dataset.platKey = p.key;
       row.dataset.platLabel = p.label;
       platRoot.appendChild(row);
     }
-
     defaultPlatforms.forEach(platformRow);
-
     $('#addPlatform').addEventListener('click', ()=>{
       const name = prompt('Custom platform name (e.g., “BlueJeans Events”)');
-      if(!name) return;
-      platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
+      if(!name) return; platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
     });
-
     function updateSavings(){
       const rows = $$('.checkbox-row', platRoot);
       let selected = 0, savings = 0;
       rows.forEach(r=>{
         const checked = $('input[type="checkbox"]', r).checked;
-        if(!checked) return;
-        selected++;
+        if(!checked) return; selected++;
         const qty = parseFloat($('.fld-qty', r).value) || 0;
         const cost = parseFloat($('.fld-cost', r).value) || 0;
         const under = Math.min(100, Math.max(0, parseFloat($('.fld-underuse', r).value) || 0));
         savings += qty * cost * (under/100);
       });
-      $('#selPlatforms').textContent = \`\${selected} platform\${selected!==1?'s':''} selected\`;
+      $('#selPlatforms').textContent = `${selected} platform${selected!==1?'s':''} selected`;
       $('#savingsPreview').textContent = money(savings);
     }
 
+    // --- helpers
     function valNum(sel){ const el = document.querySelector(sel); const v = parseFloat(el && el.value); return isFinite(v) ? v : null; }
+    function nowIso(){ return new Date().toISOString(); }
+    function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+    function downloadText(filename, text){
+      const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
 
-    $('#intake').addEventListener('submit', (e)=>{
-      e.preventDefault();
-      const payload = {
-        meeting_volume: (()=> {
-          const mode = document.querySelector('input[name="meet_mode"]:checked').value;
-          if(mode === 'per_room_per_day'){
-            return {
-              mode,
-              avg_meetings_per_room_per_day: valNum('#mtgs_per_room_day'),
-              rooms_count: valNum('#rooms_count')
-            };
-          } else {
-            return {
-              mode,
-              meetings_enterprise_per_month: valNum('#mtgs_enterprise_month'),
-              employees_count: valNum('#employees_count')
-            };
-          }
-        })(),
+    // --- SOP JSON builder (what you paste with /sop)
+    function buildSop(payload){
+      const steps = [
+        {
+          id: "prep_intake_payload",
+          title: "Confirm intake payload",
+          instruction: "Review captured parameters and confirm scope (rooms, employees, hours, incidents).",
+          inputs: payload,
+          expected_output: "Signed-off intake payload for baseline run."
+        },
+        {
+          id: "mcp_scaffold",
+          title: "Create/verify MCP connections",
+          instruction: "Ensure MCP tool configs exist and are reachable.",
+          tools: [
+            { id: "mcp.zoom",            secrets: ["ZOOM_ACCOUNT_ID","ZOOM_CLIENT_ID","ZOOM_CLIENT_SECRET"] },
+            { id: "mcp.zoom_workspaces", secrets: ["ZOOM_WORKSPACES_API_KEY"] },
+            { id: "mcp.servicenow",      secrets: ["SN_INSTANCE","SN_USERNAME","SN_TOKEN"] },
+            { id: "mcp.25live",          secrets: ["TWENTYFIVELIVE_BASE_URL","TWENTYFIVELIVE_API_KEY"] }
+          ],
+          expected_output: "All MCP tools registered and authenticated."
+        },
+        {
+          id: "baseline_capture",
+          title: "Capture baseline metrics",
+          instruction: "Using MCP tools, pull 30-day baseline: meetings, participants, minutes, room utilization, incident rates, and license utilization.",
+          expected_output: "Baseline snapshot persisted with evidence (timestamps, queries, counts)."
+        },
+        {
+          id: "kb_seed",
+          title: "Seed/Update KB in ServiceNow",
+          instruction: "Synthesize an executive-readable baseline summary and post to ServiceNow KB; notify Slack.",
+          expected_output: "SN KB article link + Slack message URL."
+        },
+        {
+          id: "schedule_runs",
+          title: "Schedule recurring baseline rollups",
+          instruction: "Set weekly automation to refresh metrics and track Value Realized deltas.",
+          expected_output: "Scheduled workflow entry visible on Dashboard."
+        }
+      ];
+
+      const how_to = [
+        "Click “Download SOP JSON” and paste into Chat with /sop.",
+        "Review generated Recipe YAML, save it in Recipes.",
+        "Attach the recipe to an agent in Agents.",
+        "Create a Workflow “Baseline Capture” using that recipe and run it.",
+        "View evidence and deltas in Dashboard; schedule weekly runs."
+      ];
+
+      return {
+        sop_title: "IPAV Baseline Capture + MCP Scaffold",
+        goal: "Establish 30-day baseline and license underuse, then schedule deltas for Value Realized.",
+        context: payload,
+        steps,
+        acceptance_criteria: [
+          "MCP tools registered and authenticated.",
+          "Baseline snapshot saved with evidence hashes and timestamps.",
+          "KB article created/updated with links to evidence and charts.",
+          "Slack notification posted to #av-ops (or configured channel)."
+        ],
+        how_to_implement: how_to,
+        meta: { generated_at: nowIso(), schema_version: "1.0.0" }
+      };
+    }
+
+    // --- YAML builder (preview/importable recipe)
+    function yamlEscape(s){ return String(s||'').replace(/"/g,'\\"'); }
+    function buildYaml(payload){
+      const id = `ipav-baseline-${slug(payload.hours_of_operation || 'hours')}-${Date.now()}`;
+      const platforms = (payload.license_optimization?.selected||[]).map(p=>{
+        return `      - key: ${p.key}
+        label: "${yamlEscape(p.label)}"
+        licenses: ${p.licenses ?? 0}
+        monthly_cost_per_license_usd: ${p.monthly_cost_per_license_usd ?? 0}
+        underuse_percent: ${p.underuse_percent ?? 0}`;
+      }).join("\\n");
+
+      const meetingsMode = payload.meeting_volume?.mode || "per_room_per_day";
+      const mv = payload.meeting_volume || {};
+      const incidentsMode = payload.support_incidents?.mode || "per_room";
+      const inc = payload.support_incidents || {};
+
+      return `# IPAV Recipe: Baseline Capture + MCP Scaffold
+version: "1.0"
+recipe:
+  id: ${id}
+  name: "IPAV Baseline Capture"
+  description: >
+    Establishes baseline meeting volume, attendance, incident rates, and license utilization.
+    Scaffolds MCP tools (Zoom, Zoom Workspaces, ServiceNow, 25Live) and persists a baseline snapshot
+    for Value Realized tracking.
+  tags: [baseline, value-realized, intake, mcp, ipav]
+  parameters:
+    avg_attendees_per_meeting: ${payload.avg_attendees_per_meeting ?? 0}
+    loaded_cost_per_hour_usd: ${payload.loaded_cost_per_hour_usd ?? 0}
+    hours_of_operation: "${yamlEscape(payload.hours_of_operation || '')}"
+    environment:
+      rooms: ${payload.environment_defaults?.rooms ?? 500}
+      employees: ${payload.environment_defaults?.employees ?? 10000}
+      stacks: [${(payload.environment_defaults?.stacks||[]).map(s=>'"'+yamlEscape(s)+'"').join(', ')}]
+    meeting_volume:
+      mode: ${meetingsMode}
+      avg_meetings_per_room_per_day: ${mv.avg_meetings_per_room_per_day ?? 0}
+      rooms_count: ${mv.rooms_count ?? 0}
+      meetings_enterprise_per_month: ${mv.meetings_enterprise_per_month ?? 0}
+      employees_count: ${mv.employees_count ?? 0}
+    support_incidents:
+      mode: ${incidentsMode}
+      incidents_per_room_per_month: ${inc.incidents_per_room_per_month ?? 0}
+      rooms_count: ${inc.rooms_count ?? 0}
+      incidents_enterprise_per_month: ${inc.incidents_enterprise_per_month ?? 0}
+    license_candidates:
+${platforms ? platforms : "      - {}"}
+  prerequisites:
+    mcp_tools:
+      - id: mcp.zoom
+        secrets: [ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET]
+      - id: mcp.zoom_workspaces
+        secrets: [ZOOM_WORKSPACES_API_KEY]
+      - id: mcp.servicenow
+        secrets: [SN_INSTANCE, SN_USERNAME, SN_TOKEN]
+      - id: mcp.25live
+        secrets: [TWENTYFIVELIVE_BASE_URL, TWENTYFIVELIVE_API_KEY]
+
+  flow:
+    - id: ensure_mcp
+      action: ensure_mcp_tools
+      input:
+        tools: ["mcp.zoom", "mcp.zoom_workspaces", "mcp.servicenow", "mcp.25live"]
+
+    - id: fetch_zoom_baseline
+      action: call
+      tool: mcp.zoom.reports
+      input:
+        date_range: "last_30_days"
+        metrics: ["meetings_count","participants_total","meeting_minutes"]
+      save_as: zoom_baseline
+
+    - id: fetch_workspaces_util
+      action: call
+      tool: mcp.zoom_workspaces.utilization
+      input:
+        rooms: \${{params.environment.rooms}}
+      save_as: workspaces_util
+
+    - id: compute_incident_baseline
+      action: compute
+      input:
+        mode: \${{params.support_incidents.mode}}
+        incidents_per_room_per_month: \${{params.support_incidents.incidents_per_room_per_month}}
+        rooms_count: \${{params.support_incidents.rooms_count}}
+        incidents_enterprise_per_month: \${{params.support_incidents.incidents_enterprise_per_month}}
+      save_as: incidents_baseline
+
+    - id: compute_license_underuse
+      action: compute_license_savings
+      input:
+        candidates: \${{params.license_candidates}}
+      save_as: license_baseline
+
+    - id: persist_snapshot
+      action: persist_baseline
+      input:
+        snapshot:
+          zoom: \${{steps.fetch_zoom_baseline.output}}
+          workspaces: \${{steps.fetch_workspaces_util.output}}
+          incidents: \${{steps.compute_incident_baseline.output}}
+          licenses: \${{steps.compute_license_underuse.output}}
+      save_as: baseline_snapshot
+
+    - id: publish_kb
+      action: call
+      tool: mcp.servicenow.kb.create_or_update
+      input:
+        title: "IPAV Baseline Snapshot"
+        body_markdown: |
+          ## Baseline Snapshot
+          Generated: \${{now}}
+          ### Zoom
+          \${{steps.fetch_zoom_baseline.output}}
+          ### Workspaces
+          \${{steps.fetch_workspaces_util.output}}
+          ### Incidents
+          \${{steps.compute_incident_baseline.output}}
+          ### Licenses
+          \${{steps.compute_license_underuse.output}}
+      save_as: kb_article
+
+    - id: notify_slack
+      action: call
+      tool: mcp.servicenow.notify_slack  # or mcp.slack.post if you use a Slack MCP
+      input:
+        channel: "#av-ops"
+        text: "Baseline snapshot ready — KB: \${{steps.publish_kb.output.url}}"
+
+  success_criteria:
+    - "All MCP tools reachable and authenticated."
+    - "Baseline snapshot stored with evidence references."
+    - "ServiceNow KB updated with summary and links."
+    - "Slack notification sent to the configured channel."
+
+  outputs:
+    - id: baseline_snapshot
+      from: baseline_snapshot
+    - id: kb_article_url
+      from: publish_kb
+`;
+    }
+
+    // --- serialize intake → payload
+    function makePayload(){
+      const meeting = (()=> {
+        const mode = document.querySelector('input[name="meet_mode"]:checked').value;
+        if(mode === 'per_room_per_day'){
+          return {
+            mode,
+            avg_meetings_per_room_per_day: valNum('#mtgs_per_room_day'),
+            rooms_count: valNum('#rooms_count')
+          };
+        } else {
+          return {
+            mode,
+            meetings_enterprise_per_month: valNum('#mtgs_enterprise_month'),
+            employees_count: valNum('#employees_count')
+          };
+        }
+      })();
+
+      const incidents = (()=> {
+        const mode = document.querySelector('input[name="inc_mode"]:checked').value;
+        if(mode === 'per_room'){
+          return {
+            mode,
+            incidents_per_room_per_month: valNum('#incidents_per_room_month'),
+            rooms_count: valNum('#rooms_count_inc')
+          };
+        } else {
+          return {
+            mode,
+            incidents_enterprise_per_month: valNum('#incidents_enterprise_month'),
+            rooms_count_reference: valNum('#rooms_count_inc_ro')
+          };
+        }
+      })();
+
+      const hoursSel = document.querySelector('input[name="hours"]:checked').value;
+      const hours = hoursSel === 'custom' ? (document.querySelector('#hours_custom').value || 'custom') : hoursSel;
+
+      const rows = Array.from(document.querySelectorAll('.checkbox-row', platRoot));
+      const selected = [];
+      rows.forEach(r=>{
+        const cb = r.querySelector('input[type="checkbox"]');
+        if(!cb.checked) return;
+        selected.push({
+          key: r.dataset.platKey,
+          label: r.dataset.platLabel,
+          licenses: parseFloat(r.querySelector('.fld-qty').value) || 0,
+          monthly_cost_per_license_usd: parseFloat(r.querySelector('.fld-cost').value) || null,
+          underuse_percent: parseFloat(r.querySelector('.fld-underuse').value) || null
+        });
+      });
+      const est_monthly_savings = selected.reduce((acc,p)=>{
+        const qty = p.licenses||0, cost = p.monthly_cost_per_license_usd||0, under = Math.min(100,Math.max(0,p.underuse_percent||0));
+        return acc + qty*cost*(under/100);
+      }, 0);
+
+      return {
+        meeting_volume: meeting,
         avg_attendees_per_meeting: valNum('#avg_attendees'),
         loaded_cost_per_hour_usd: valNum('#loaded_cost_hour'),
-        support_incidents: (()=> {
-          const mode = document.querySelector('input[name="inc_mode"]:checked').value;
-          if(mode === 'per_room'){
-            return {
-              mode,
-              incidents_per_room_per_month: valNum('#incidents_per_room_month'),
-              rooms_count: valNum('#rooms_count_inc')
-            };
-          } else {
-            return {
-              mode,
-              incidents_enterprise_per_month: valNum('#incidents_enterprise_month'),
-              rooms_count_reference: valNum('#rooms_count_inc_ro')
-            };
-          }
-        })(),
-        hours_of_operation: (()=> {
-          const sel = document.querySelector('input[name="hours"]:checked').value;
-          return sel === 'custom' ? (document.querySelector('#hours_custom').value || 'custom') : sel;
-        })(),
-        license_optimization: (()=> {
-          const rows = Array.from(document.querySelectorAll('.checkbox-row', platRoot));
-          const selected = [];
-          rows.forEach(r=>{
-            const cb = r.querySelector('input[type="checkbox"]');
-            if(!cb.checked) return;
-            selected.push({
-              key: r.dataset.platKey,
-              label: r.dataset.platLabel,
-              licenses: parseFloat(r.querySelector('.fld-qty').value) || 0,
-              monthly_cost_per_license_usd: parseFloat(r.querySelector('.fld-cost').value) || null,
-              underuse_percent: parseFloat(r.querySelector('.fld-underuse').value) || null
-            });
-          });
-          const est_monthly_savings = selected.reduce((acc, p)=>{
-            const qty = p.licenses || 0;
-            const cost = p.monthly_cost_per_license_usd || 0;
-            const under = Math.min(100, Math.max(0, p.underuse_percent || 0));
-            return acc + qty * cost * (under/100);
-          }, 0);
-          return { selected, est_monthly_savings };
-        })(),
-        environment_defaults: { rooms: 500, employees: 10000, stacks: ["Zoom", "Q-SYS", "Crestron", "Logitech"] },
-        meta: { generated_at: new Date().toISOString(), schema_version: "1.0.0" }
+        support_incidents: incidents,
+        hours_of_operation: hours,
+        license_optimization: { selected, est_monthly_savings },
+        environment_defaults: { rooms: 500, employees: 10000, stacks: ["Zoom","Q-SYS","Crestron","Logitech"] },
+        meta: { generated_at: nowIso(), schema_version: "1.0.0" }
       };
-      document.querySelector('#jsonOut').value = JSON.stringify(payload, null, 2);
-      updateSavings();
+    }
+
+    // --- wire buttons
+    $('#intake').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const payload = makePayload();
+      const sop = buildSop(payload);
+      const yaml = buildYaml(payload);
+      $('#jsonOut').value = JSON.stringify(sop, null, 2);
+      $('#yamlOut').value = yaml;
     });
 
     document.querySelector('#copyJson').addEventListener('click', async ()=>{
       const txt = document.querySelector('#jsonOut').value.trim();
       const copyState = document.querySelector('#copyState');
-      if(!txt){ copyState.textContent = 'Nothing to copy yet—click “Generate JSON” first.'; return; }
-      try{
-        await navigator.clipboard.writeText(txt);
-        copyState.textContent = 'Copied ✓';
-        copyState.className = 'small success';
-        setTimeout(()=>{copyState.textContent='';}, 2000);
-      }catch{
-        copyState.textContent = 'Copy failed — select & copy manually.';
-        copyState.className = 'small warn';
-      }
+      if(!txt){ copyState.textContent = 'Generate first.'; return; }
+      try{ await navigator.clipboard.writeText(txt); copyState.textContent = 'SOP JSON copied ✓'; copyState.className = 'small success';
+      }catch{ copyState.textContent = 'Copy failed — select & copy manually.'; copyState.className = 'small warn'; }
+      setTimeout(()=>{copyState.textContent='';}, 2000);
+    });
+
+    document.querySelector('#copyYaml').addEventListener('click', async ()=>{
+      const txt = document.querySelector('#yamlOut').value.trim();
+      const copyState = document.querySelector('#copyState');
+      if(!txt){ copyState.textContent = 'Generate first.'; return; }
+      try{ await navigator.clipboard.writeText(txt); copyState.textContent = 'YAML copied ✓'; copyState.className = 'small success';
+      }catch{ copyState.textContent = 'Copy failed — select & copy manually.'; copyState.className = 'small warn'; }
+      setTimeout(()=>{copyState.textContent='';}, 2000);
+    });
+
+    document.querySelector('#downloadSop').addEventListener('click', ()=>{
+      const txt = document.querySelector('#jsonOut').value.trim();
+      if(!txt){ alert('Generate first.'); return; }
+      downloadText('ipav_baseline_sop.json', txt);
+    });
+
+    document.querySelector('#downloadYaml').addEventListener('click', ()=>{
+      const txt = document.querySelector('#yamlOut').value.trim();
+      if(!txt){ alert('Generate first.'); return; }
+      downloadText('ipav_baseline_recipe.yaml', txt);
     });
   </script>
 </body>
 </html>"""
 
-# Render the form in an iframe; adjust height to taste
-components.html(form_html, height=1750, scrolling=True)
+# Render (adjust height if you expand the instructions)
+components.html(form_html, height=2100, scrolling=True)
+
