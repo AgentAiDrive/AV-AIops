@@ -29,8 +29,9 @@ from core.ui.page_tips import show as show_tip
 PAGE_KEY = "Recipes"  # identifies this page in the page tips helper
 show_tip(PAGE_KEY)
 
-st.title("📜 Recipes")
+
 st.set_page_config(page_title="Recipes", page_icon="📜", layout="wide")
+st.title("📜 Recipes")
 
 # Directory where recipe YAML files are stored.  It is created on demand.
 RECIPES_DIR = os.path.join(os.getcwd(), "recipes")
