@@ -4,8 +4,8 @@ import streamlit as st
 from pathlib import Path
 from core.db.seed import init_db
 
-st.set_page_config(page_title="SMA AV-AI Ops", page_icon="🎛️", layout="wide")
-st.title("SMA AV‑AI Ops Orchestration (Streamlit)")
+st.set_page_config(page_title="AV-AI Ops-IPAV", page_icon="🎛️", layout="wide")
+st.title("AV‑AI Ops Agentic Workflow Orchestration (MCP with IPAV)")
 st.write("Use sidebar to navigate.")
 
 def model_light():
@@ -15,8 +15,8 @@ def model_light():
 
 model_light()
 
-st.success("Database initialized.")
-
+st.success("Database seeded & initialized.")
+st.title("❓ Help & Runbook")
 try:
     from core.ui.page_tips import PAGE_TIPS  # type: ignore
 except Exception:
@@ -31,7 +31,7 @@ except Exception:
         "Dashboard": "KPIs (runs, success %, p95 duration), trends, and run details (steps + artifacts).",
     }
 
-st.title("❓ Help & Runbook")
+
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
     """Walk up from this file to find the app root (where app.py / core / pages live)."""
