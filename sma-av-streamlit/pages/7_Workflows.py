@@ -14,7 +14,6 @@ from core.ui.page_tips import show as show_tip
 PAGE_KEY = "Workflows"
 show_tip(PAGE_KEY)
 
-st.set_page_config(page_title="Workflows", page_icon="🧩", layout="wide")
 st.title("🧩 Workflows")
 init_db()
 
