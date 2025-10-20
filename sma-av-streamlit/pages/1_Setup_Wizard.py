@@ -6,15 +6,18 @@ from core.ui.page_tips import show as show_tip
 PAGE_KEY = "Setup Wizard"
 show_tip(PAGE_KEY)
 
+# Title and description for the setup wizard
 st.title("🏁 Setup Wizard")
 st.write("Initialize database, seed demo agents, tools, and recipes.")
 
+# Button to seed demo data
 if st.button("Initialize database & seed demo data"):
     seed_demo()
     st.success("Seed complete.")
 
+# Instructions for using the form
 st.caption("""
-**What this form is for:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, 
+**What this form is for:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, \
 and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.
 
 **How to complete the form:**
@@ -28,6 +31,11 @@ and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV
 st.divider()
 st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 
+# HTML intake form for capturing environment details.  The form uses inline
+# JavaScript to manage UI toggles, compute savings, build payloads, and
+# generate the SOP JSON and YAML outputs.  At the bottom of the script we
+# insert a validation function and modify the submit handler to perform
+# validation before generating the outputs.
 form_html = """<!doctype html>
 <html lang="en">
 <head>
@@ -303,7 +311,7 @@ form_html = """<!doctype html>
     defaultPlatforms.forEach(platformRow);
     $('#addPlatform').addEventListener('click', ()=>{
       const name = prompt('Custom platform name (e.g., “BlueJeans Events”)');
-      if(!name) return; platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
+      if(!name) return; platformRow({ key: name.toLowerCase().replace(/\W+/g,'_'), label: name });
     });
     function updateSavings(){
       const rows = $$('.checkbox-row', platRoot);
@@ -407,7 +415,7 @@ form_html = """<!doctype html>
         licenses: ${p.licenses ?? 0}
         monthly_cost_per_license_usd: ${p.monthly_cost_per_license_usd ?? 0}
         underuse_percent: ${p.underuse_percent ?? 0}`;
-      }).join("\\n");
+      }).join("\n");
 
       const meetingsMode = payload.meeting_volume?.mode || "per_room_per_day";
       const mv = payload.meeting_volume || {};
@@ -431,7 +439,7 @@ recipe:
     environment:
       rooms: ${payload.environment_defaults?.rooms ?? 500}
       employees: ${payload.environment_defaults?.employees ?? 10000}
-      stacks: [${(payload.environment_defaults?.stacks||[]).map(s=>'"'+yamlEscape(s)+'"').join(', ')}]
+      stacks: [${(payload.environment_defaults?.stacks||[]).map(s=> '"'+yamlEscape(s)+'"').join(', ')}]
     meeting_volume:
       mode: ${meetingsMode}
       avg_meetings_per_room_per_day: ${mv.avg_meetings_per_room_per_day ?? 0}
@@ -538,7 +546,7 @@ ${platforms ? platforms : "      - {}"}
       from: baseline_snapshot
     - id: kb_article_url
       from: publish_kb
-`;
+ `;
     }
 
     // --- serialize intake → payload
@@ -610,14 +618,77 @@ ${platforms ? platforms : "      - {}"}
       };
     }
 
+    // --- validation helpers
+    function validatePayload(payload){
+      const errors = [];
+      const warn = [];
+      // meeting volume
+      const mv = payload.meeting_volume || {};
+      if(mv.mode === 'per_room_per_day'){
+        const perDay = parseFloat(mv.avg_meetings_per_room_per_day);
+        if(!isFinite(perDay) || perDay < 0 || perDay > 24){
+          errors.push('Avg meetings per room per day must be between 0 and 24.');
+        }
+        if(!mv.rooms_count || mv.rooms_count <= 0){
+          errors.push('Rooms count must be a positive number.');
+        }
+      } else {
+        if(!mv.meetings_enterprise_per_month || mv.meetings_enterprise_per_month < 0){
+          errors.push('Enterprise meetings per month must be non-negative.');
+        }
+        if(!mv.employees_count || mv.employees_count <= 0){
+          errors.push('Employees count must be a positive number.');
+        }
+      }
+      // support incidents
+      const inc = payload.support_incidents || {};
+      if(inc.mode === 'per_room'){
+        if(!inc.incidents_per_room_per_month || inc.incidents_per_room_per_month < 0){
+          errors.push('Incidents per room per month must be non-negative.');
+        }
+        if(!inc.rooms_count || inc.rooms_count <= 0){
+          errors.push('Rooms count for incidents must be positive.');
+        }
+      } else {
+        if(!inc.incidents_enterprise_per_month || inc.incidents_enterprise_per_month < 0){
+          errors.push('Incidents per month must be non-negative.');
+        }
+      }
+      // license optimization
+      (payload.license_optimization?.selected || []).forEach(p => {
+        if(p.licenses && p.licenses <= 0){
+          errors.push(`Platform ${p.label}: license count must be greater than 0.`);
+        }
+        if(p.underuse_percent && (p.underuse_percent < 0 || p.underuse_percent > 100)){
+          errors.push(`Platform ${p.label}: underuse % must be between 0 and 100.`);
+        }
+        if(p.underuse_percent > 25){
+          warn.push(`${p.label}: underuse > 25%; consider reducing licenses.`);
+        }
+      });
+      return { errors, warn };
+    }
+
     // --- wire buttons
     $('#intake').addEventListener('submit', (e)=>{
       e.preventDefault();
       const payload = makePayload();
+      const { errors, warn } = validatePayload(payload);
+      const msgBox = document.querySelector('#copyState');
+      msgBox.className = 'small';
+      if(errors.length){
+        msgBox.textContent = errors.join(' ');
+        msgBox.classList.add('warn');
+        return;
+      }
+      if(warn.length){
+        msgBox.textContent = warn.join(' ');
+        msgBox.classList.add('warn');
+      }
       const sop = buildSop(payload);
       const yaml = buildYaml(payload);
-      $('#jsonOut').value = JSON.stringify(sop, null, 2);
-      $('#yamlOut').value = yaml;
+      document.querySelector('#jsonOut').value = JSON.stringify(sop, null, 2);
+      document.querySelector('#yamlOut').value = yaml;
     });
 
     document.querySelector('#copyJson').addEventListener('click', async ()=>{
@@ -653,5 +724,5 @@ ${platforms ? platforms : "      - {}"}
 </body>
 </html>"""
 
-# Render (adjust height if you expand the instructions)
+# Render the intake form.  Adjust height as needed when expanding instructions.
 components.html(form_html, height=2100, scrolling=True)
