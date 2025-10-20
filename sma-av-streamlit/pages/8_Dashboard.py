@@ -29,11 +29,9 @@ from core.workflow.service import list_workflows, compute_status
 # ---------------------------------------------------------------------------
 # Page configuration
 # ---------------------------------------------------------------------------
-st.set_page_config(page_title="Dashboard", layout="wide")
+st.set_page_config(page_title="Dashboard", page_icon="📊", layout="wide")
 st.title("📊 Dashboard")
 st.caption("AV AI OPS — Live view of workflow runs, steps, artifacts, and KPIs.")
-
-
 # ---------------------------------------------------------------------------
 # Instantiate the run store via factory
 # ---------------------------------------------------------------------------
@@ -464,3 +462,4 @@ with get_session() as db:
             f"<br/>Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'}",
             unsafe_allow_html=True,
         )
+
