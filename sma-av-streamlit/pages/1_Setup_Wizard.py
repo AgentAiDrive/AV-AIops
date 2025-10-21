@@ -669,7 +669,6 @@ ${platforms ? platforms : "      - {}"}
       });
       return { errors, warn };
     }
-<script>
   // Helper to check radios and fire change toggles
   function checkAndChange(el){
     if (!el) return;
@@ -740,8 +739,6 @@ ${platforms ? platforms : "      - {}"}
     const btn = document.querySelector('#loadSample');
     if (btn) btn.addEventListener('click', loadSampleValues);
   });
-</script>
-
     // --- wire buttons
     $('#intake').addEventListener('submit', (e)=>{
       e.preventDefault();
