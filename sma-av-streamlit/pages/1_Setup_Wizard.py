@@ -31,12 +31,7 @@ and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV
 st.divider()
 st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 
-# HTML intake form for capturing environment details.  The form uses inline
-# JavaScript to manage UI toggles, compute savings, build payloads, and
-# generate the SOP JSON and YAML outputs.  At the bottom of the script we
-# insert a validation function and modify the submit handler to perform
-# validation before generating the outputs.
-
+# HTML intake form + JS
 form_html = """<!doctype html>
 <html lang="en">
 <head>
@@ -313,7 +308,7 @@ form_html = """<!doctype html>
     defaultPlatforms.forEach(platformRow);
     $('#addPlatform').addEventListener('click', ()=>{
       const name = prompt('Custom platform name (e.g., “BlueJeans Events”)');
-      if(!name) return; platformRow({ key: name.toLowerCase().replace(/\W+/g,'_'), label: name });
+      if(!name) return; platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
     });
     function updateSavings(){
       const rows = $$('.checkbox-row', platRoot);
@@ -334,8 +329,8 @@ form_html = """<!doctype html>
     function valNum(sel){ const el = document.querySelector(sel); const v = parseFloat(el && el.value); return isFinite(v) ? v : null; }
     function nowIso(){ return new Date().toISOString(); }
     function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
-    function downloadText(filename, text){
-      const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+    function downloadText(filename, text, mime='text/plain;charset=utf-8'){
+      const blob = new Blob([text], {type: mime});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
@@ -417,7 +412,7 @@ form_html = """<!doctype html>
         licenses: ${p.licenses ?? 0}
         monthly_cost_per_license_usd: ${p.monthly_cost_per_license_usd ?? 0}
         underuse_percent: ${p.underuse_percent ?? 0}`;
-      }).join("\n");
+      }).join("\\n");
 
       const meetingsMode = payload.meeting_volume?.mode || "per_room_per_day";
       const mv = payload.meeting_volume || {};
@@ -484,32 +479,32 @@ ${platforms ? platforms : "      - {}"}
       action: call
       tool: mcp.zoom_workspaces.utilization
       input:
-        rooms: \${{params.environment.rooms}}
+        rooms: \\${{params.environment.rooms}}
       save_as: workspaces_util
 
     - id: compute_incident_baseline
       action: compute
       input:
-        mode: \${{params.support_incidents.mode}}
-        incidents_per_room_per_month: \${{params.support_incidents.incidents_per_room_per_month}}
-        rooms_count: \${{params.support_incidents.rooms_count}}
-        incidents_enterprise_per_month: \${{params.support_incidents.incidents_enterprise_per_month}}
+        mode: \\${{params.support_incidents.mode}}
+        incidents_per_room_per_month: \\${{params.support_incidents.incidents_per_room_per_month}}
+        rooms_count: \\${{params.support_incidents.rooms_count}}
+        incidents_enterprise_per_month: \\${{params.support_incidents.incidents_enterprise_per_month}}
       save_as: incidents_baseline
 
     - id: compute_license_underuse
       action: compute_license_savings
       input:
-        candidates: \${{params.license_candidates}}
+        candidates: \\${{params.license_candidates}}
       save_as: license_baseline
 
     - id: persist_snapshot
       action: persist_baseline
       input:
         snapshot:
-          zoom: \${{steps.fetch_zoom_baseline.output}}
-          workspaces: \${{steps.fetch_workspaces_util.output}}
-          incidents: \${{steps.compute_incident_baseline.output}}
-          licenses: \${{steps.compute_license_underuse.output}}
+          zoom: \\${{steps.fetch_zoom_baseline.output}}
+          workspaces: \\${{steps.fetch_workspaces_util.output}}
+          incidents: \\${{steps.compute_incident_baseline.output}}
+          licenses: \\${{steps.compute_license_underuse.output}}
       save_as: baseline_snapshot
 
     - id: publish_kb
@@ -519,15 +514,15 @@ ${platforms ? platforms : "      - {}"}
         title: "IPAV Baseline Snapshot"
         body_markdown: |
           ## Baseline Snapshot
-          Generated: \${{now}}
+          Generated: \\${{now}}
           ### Zoom
-          \${{steps.fetch_zoom_baseline.output}}
+          \\${{steps.fetch_zoom_baseline.output}}
           ### Workspaces
-          \${{steps.fetch_workspaces_util.output}}
+          \\${{steps.fetch_workspaces_util.output}}
           ### Incidents
-          \${{steps.compute_incident_baseline.output}}
+          \\${{steps.compute_incident_baseline.output}}
           ### Licenses
-          \${{steps.compute_license_underuse.output}}
+          \\${{steps.compute_license_underuse.output}}
       save_as: kb_article
 
     - id: notify_slack
@@ -535,7 +530,7 @@ ${platforms ? platforms : "      - {}"}
       tool: mcp.servicenow.notify_slack  # or mcp.slack.post if you use a Slack MCP
       input:
         channel: "#av-ops"
-        text: "Baseline snapshot ready — KB: \${{steps.publish_kb.output.url}}"
+        text: "Baseline snapshot ready — KB: \\${{steps.publish_kb.output.url}}"
 
   success_criteria:
     - "All MCP tools reachable and authenticated."
@@ -553,7 +548,7 @@ ${platforms ? platforms : "      - {}"}
 
     // --- serialize intake → payload
     function makePayload(){
-      const meeting = (()=> {
+      const meeting = (()=>{
         const mode = document.querySelector('input[name="meet_mode"]:checked').value;
         if(mode === 'per_room_per_day'){
           return {
@@ -570,7 +565,7 @@ ${platforms ? platforms : "      - {}"}
         }
       })();
 
-      const incidents = (()=> {
+      const incidents = (()=>{
         const mode = document.querySelector('input[name="inc_mode"]:checked').value;
         if(mode === 'per_room'){
           return {
@@ -620,7 +615,7 @@ ${platforms ? platforms : "      - {}"}
       };
     }
 
-       // --- validation helpers
+    // --- validation helpers
     function validatePayload(payload){
       const errors = [];
       const warn = [];
@@ -644,7 +639,7 @@ ${platforms ? platforms : "      - {}"}
         }
       }
 
-      // attendees & cost (basic sanity)
+      // attendees & cost
       const att = Number(payload.avg_attendees_per_meeting);
       if (!Number.isFinite(att) || att <= 0) {
         errors.push('Average attendee count per meeting must be greater than 0.');
@@ -684,15 +679,14 @@ ${platforms ? platforms : "      - {}"}
       return { errors, warn };
     }
 
-    // --- sample loader (NO extra <script> tag here)
+    // --- sample loader
     function checkAndChange(el){
       if (!el) return;
       el.checked = true;
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
-
     function setPlatformSample(key, { qty=0, cost=0, under=0 } = {}){
-      const row = platRoot.querySelector(`.checkbox-row[data-plat-key="${key}"]`);
+      const row = platRoot.querySelector(\`.checkbox-row[data-plat-key="\${key}"]\`);
       if(!row) return;
       const cb = row.querySelector('input[type="checkbox"]');
       const qtyEl = row.querySelector('.fld-qty');
@@ -702,7 +696,6 @@ ${platforms ? platforms : "      - {}"}
       cb.dispatchEvent(new Event('change', { bubbles: true })); // enables inputs
       qtyEl.value = qty; costEl.value = cost; underEl.value = under;
     }
-
     function loadSampleValues(){
       // Meetings
       checkAndChange(document.querySelector('#mode_room_day'));
@@ -738,19 +731,9 @@ ${platforms ? platforms : "      - {}"}
       const jsonOut = document.querySelector('#jsonOut');
       if (jsonOut) jsonOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-
-    document.addEventListener('DOMContentLoaded', ()=>{
-      const btn = document.querySelector('#loadSample');
-      if (btn) btn.addEventListener('click', loadSampleValues);
-    });
-
-    // --- enhance downloader to support proper mime types
-    function downloadText(filename, text, mime='text/plain;charset=utf-8'){
-      const blob = new Blob([text], {type: mime});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
+    // Attach immediately (script is at end of body)
+    const sampleBtn = document.querySelector('#loadSample');
+    if (sampleBtn) sampleBtn.addEventListener('click', loadSampleValues);
 
     // --- wire buttons
     $('#intake').addEventListener('submit', (e)=>{
@@ -807,5 +790,8 @@ ${platforms ? platforms : "      - {}"}
       downloadText('ipav_baseline_recipe.yaml', txt, 'text/yaml;charset=utf-8');
     });
   </script>
-</body> 
+</body>
 </html>"""
+
+# Render the intake form. Adjust height as needed when expanding instructions.
+components.html(form_html, height=2100, scrolling=True)
