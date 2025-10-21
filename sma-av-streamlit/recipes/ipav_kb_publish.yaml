@@ -1,0 +1,46 @@
+name: publish_kb_from_sop
+version: 1
+description: Convert a SOP to a ServiceNow KB article (draft) and attach artifacts.
+params:
+  kb_base_sys_id: "<<<PUT_YOUR_KB_BASE_SYS_ID>>>"
+  category: "Operations > AV"
+  publish_if_allowed: false
+  attachments: []  # list of file paths
+
+steps:
+  - id: intake.sop
+    tool: llm.extract
+    input:
+      schema: kb_article_schema  # reference to KB_SCHEMA above
+      fields: [short_description, html, kb_base_sys_id, category, tags]
+      provide:
+        sop_markdown: "{{input.sop_markdown}}"
+        kb_base_sys_id: "{{params.kb_base_sys_id}}"
+        category: "{{params.category}}"
+
+  - id: act.create
+    tool: servicenow.kb.create
+    input:
+      short_description: "{{intake.sop.short_description}}"
+      text: "{{intake.sop.html}}"
+      kb_knowledge_base: "{{intake.sop.kb_base_sys_id}}"
+      category: "{{intake.sop.category}}"
+
+  - id: act.attachments
+    foreach: "{{params.attachments}}"
+    tool: servicenow.kb.attach
+    input:
+      sys_id: "{{act.create.result.sys_id}}"
+      file_path: "{{item}}"
+
+  - id: verify.fetch
+    tool: servicenow.kb.get
+    input:
+      sys_id: "{{act.create.result.sys_id}}"
+
+assertions:
+  - "verify.fetch.result.sys_id != null"
+  - "verify.fetch.result.workflow_state in ['draft','published','pending_approval']"
+outputs:
+  article_sys_id: "{{act.create.result.sys_id}}"
+  number: "{{verify.fetch.result.number}}"
