@@ -1,3 +1,4 @@
+# pages/4_Recipes.py
 """
 Recipes page for the AV operations assistant.
 This script provides a UI for creating, viewing and editing YAML recipes
@@ -9,6 +10,7 @@ previous runs and integrates with version control to surface git hints.
 from __future__ import annotations  # <-- must be here (after docstring)
 import os
 import subprocess
+import json  # Added import so json.dumps works:contentReference[oaicite:2]{index=2}
 from datetime import datetime
 from pathlib import Path
 from core.db.models import Recipe
@@ -28,7 +30,6 @@ from core.io.port import import_zip  # reuses your existing import/merge logic
 #
 PAGE_KEY = "Recipes"  # identifies this page in the page tips helper
 show_tip(PAGE_KEY)
-
 
 st.title("📜 Recipes")
 
@@ -141,6 +142,7 @@ with st.expander("Import YAML files into the recipe library", expanded=True):
 st.caption("Files are saved to the local **recipes/** folder and registered in the database so they appear here and in Workflows.")
 # --- End Recipes Toolbar ------------------------------------------------------
 
+
 # Directory where recipe YAML files are stored.  It is created on demand.
 RECIPES_DIR = os.path.join(os.getcwd(), "recipes")
 os.makedirs(RECIPES_DIR, exist_ok=True)
@@ -204,17 +206,22 @@ if st.button("Save Recipe") and new_name and new_file:
         st.error(msg)
     else:
         try:
+            # Ensure filename ends with .yaml
+            fname = new_file.strip()
+            if not fname.lower().endswith((".yaml", ".yml")):
+                fname += ".yaml"
             # Save the YAML file to disk
-            save_recipe_yaml(new_file, new_text)
+            save_recipe_yaml(fname, new_text)
             # Register in the database if not already present
             with get_session() as db:  # type: ignore
                 if not db.query(Recipe).filter(Recipe.name == new_name).first():
-                    db.add(Recipe(name=new_name, yaml_path=new_file))
+                    db.add(Recipe(name=new_name, yaml_path=fname))
                     db.commit()
             st.success("Recipe saved with guardrails template.")
+            # Refresh the page so the new recipe shows up immediately
+            st.rerun()
         except Exception as e:
             st.error(f"Failed to save recipe: {type(e).__name__}: {e}")
-
 
 st.divider()
 st.subheader("Existing Recipes")
@@ -284,7 +291,6 @@ with get_session() as db:  # type: ignore
                 db.delete(r)
                 db.commit()
                 st.rerun()
-
 
 st.divider()
 with st.expander("Recipe version control best practices", expanded=False):
