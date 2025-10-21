@@ -6,16 +6,13 @@ from core.ui.page_tips import show as show_tip
 PAGE_KEY = "Setup Wizard"
 show_tip(PAGE_KEY)
 
-# Title and description for the setup wizard
 st.title("🏁 Setup Wizard")
 st.write("Initialize database, seed demo agents, tools, and recipes.")
 
-# Button to seed demo data
 if st.button("Initialize database & seed demo data"):
     seed_demo()
     st.success("Seed complete.")
 
-# Instructions for using the form
 st.caption("""
 **What this form is for:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, \
 and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.
@@ -31,7 +28,6 @@ and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV
 st.divider()
 st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 
-# HTML intake form + JS
 form_html = """<!doctype html>
 <html lang="en">
 <head>
@@ -208,7 +204,7 @@ form_html = """<!doctype html>
         </div>
       </div>
 
-      <!-- IMPLEMENTATION HOW-TO (shown in SOP too) -->
+      <!-- IMPLEMENTATION HOW-TO -->
       <div class="card">
         <h2>How to Implement in the IPAV App</h2>
         <details open>
@@ -311,7 +307,7 @@ form_html = """<!doctype html>
       if(!name) return; platformRow({ key: name.toLowerCase().replace(/\\W+/g,'_'), label: name });
     });
     function updateSavings(){
-      const rows = $$('.checkbox-row', platRoot);
+      const rows = Array.from(platRoot.querySelectorAll('.checkbox-row'));  // FIXED: scoping to platRoot
       let selected = 0, savings = 0;
       rows.forEach(r=>{
         const checked = $('input[type="checkbox"]', r).checked;
@@ -336,46 +332,20 @@ form_html = """<!doctype html>
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    // --- SOP JSON builder (what you paste with /sop)
+    // --- SOP JSON builder
     function buildSop(payload){
       const steps = [
-        {
-          id: "prep_intake_payload",
-          title: "Confirm intake payload",
-          instruction: "Review captured parameters and confirm scope (rooms, employees, hours, incidents).",
-          inputs: payload,
-          expected_output: "Signed-off intake payload for baseline run."
-        },
-        {
-          id: "mcp_scaffold",
-          title: "Create/verify MCP connections",
-          instruction: "Ensure MCP tool configs exist and are reachable.",
-          tools: [
+        { id: "prep_intake_payload", title: "Confirm intake payload", instruction: "Review captured parameters and confirm scope (rooms, employees, hours, incidents).", inputs: payload, expected_output: "Signed-off intake payload for baseline run." },
+        { id: "mcp_scaffold", title: "Create/verify MCP connections", instruction: "Ensure MCP tool configs exist and are reachable.", tools: [
             { id: "mcp.zoom",            secrets: ["ZOOM_ACCOUNT_ID","ZOOM_CLIENT_ID","ZOOM_CLIENT_SECRET"] },
             { id: "mcp.zoom_workspaces", secrets: ["ZOOM_WORKSPACES_API_KEY"] },
             { id: "mcp.servicenow",      secrets: ["SN_INSTANCE","SN_USERNAME","SN_TOKEN"] },
             { id: "mcp.25live",          secrets: ["TWENTYFIVELIVE_BASE_URL","TWENTYFIVELIVE_API_KEY"] }
           ],
-          expected_output: "All MCP tools registered and authenticated."
-        },
-        {
-          id: "baseline_capture",
-          title: "Capture baseline metrics",
-          instruction: "Using MCP tools, pull 30-day baseline: meetings, participants, minutes, room utilization, incident rates, and license utilization.",
-          expected_output: "Baseline snapshot persisted with evidence (timestamps, queries, counts)."
-        },
-        {
-          id: "kb_seed",
-          title: "Seed/Update KB in ServiceNow",
-          instruction: "Synthesize an executive-readable baseline summary and post to ServiceNow KB; notify Slack.",
-          expected_output: "SN KB article link + Slack message URL."
-        },
-        {
-          id: "schedule_runs",
-          title: "Schedule recurring baseline rollups",
-          instruction: "Set weekly automation to refresh metrics and track Value Realized deltas.",
-          expected_output: "Scheduled workflow entry visible on Dashboard."
-        }
+          expected_output: "All MCP tools registered and authenticated." },
+        { id: "baseline_capture", title: "Capture baseline metrics", instruction: "Using MCP tools, pull 30-day baseline: meetings, participants, minutes, room utilization, incident rates, and license utilization.", expected_output: "Baseline snapshot persisted with evidence (timestamps, queries, counts)." },
+        { id: "kb_seed", title: "Seed/Update KB in ServiceNow", instruction: "Synthesize an executive-readable baseline summary and post to ServiceNow KB; notify Slack.", expected_output: "SN KB article link + Slack message URL." },
+        { id: "schedule_runs", title: "Schedule recurring baseline rollups", instruction: "Set weekly automation to refresh metrics and track Value Realized deltas.", expected_output: "Scheduled workflow entry visible on Dashboard." }
       ];
 
       const how_to = [
@@ -402,7 +372,7 @@ form_html = """<!doctype html>
       };
     }
 
-    // --- YAML builder (preview/importable recipe)
+    // --- YAML builder
     function yamlEscape(s){ return String(s||'').replace(/"/g,'\\"'); }
     function buildYaml(payload){
       const id = `ipav-baseline-${slug(payload.hours_of_operation || 'hours')}-${Date.now()}`;
@@ -527,7 +497,7 @@ ${platforms ? platforms : "      - {}"}
 
     - id: notify_slack
       action: call
-      tool: mcp.servicenow.notify_slack  # or mcp.slack.post if you use a Slack MCP
+      tool: mcp.servicenow.notify_slack
       input:
         channel: "#av-ops"
         text: "Baseline snapshot ready — KB: \\${{steps.publish_kb.output.url}}"
@@ -585,7 +555,7 @@ ${platforms ? platforms : "      - {}"}
       const hoursSel = document.querySelector('input[name="hours"]:checked').value;
       const hours = hoursSel === 'custom' ? (document.querySelector('#hours_custom').value || 'custom') : hoursSel;
 
-      const rows = Array.from(document.querySelectorAll('.checkbox-row', platRoot));
+      const rows = Array.from(platRoot.querySelectorAll('.checkbox-row')); // FIXED scope
       const selected = [];
       rows.forEach(r=>{
         const cb = r.querySelector('input[type="checkbox"]');
@@ -620,7 +590,6 @@ ${platforms ? platforms : "      - {}"}
       const errors = [];
       const warn = [];
 
-      // meeting volume
       const mv = payload.meeting_volume || {};
       if(mv.mode === 'per_room_per_day'){
         const perDay = parseFloat(mv.avg_meetings_per_room_per_day);
@@ -631,15 +600,14 @@ ${platforms ? platforms : "      - {}"}
           errors.push('Rooms count must be a positive number.');
         }
       } else {
-        if(!mv.meetings_enterprise_per_month || mv.meetings_enterprise_per_month < 0){
-          errors.push('Enterprise meetings per month must be non-negative.');
+        if(!isFinite(mv.meetings_enterprise_per_month) || mv.meetings_enterprise_per_month < 0){
+          errors.push('Enterprise meetings per month must be non-negative.'); // FIXED check
         }
         if(!mv.employees_count || mv.employees_count <= 0){
           errors.push('Employees count must be a positive number.');
         }
       }
 
-      // attendees & cost
       const att = Number(payload.avg_attendees_per_meeting);
       if (!Number.isFinite(att) || att <= 0) {
         errors.push('Average attendee count per meeting must be greater than 0.');
@@ -649,7 +617,6 @@ ${platforms ? platforms : "      - {}"}
         errors.push('Loaded cost per hour must be 0 or greater.');
       }
 
-      // support incidents
       const inc = payload.support_incidents || {};
       if(inc.mode === 'per_room'){
         if(!isFinite(inc.incidents_per_room_per_month) || inc.incidents_per_room_per_month < 0){
@@ -664,7 +631,6 @@ ${platforms ? platforms : "      - {}"}
         }
       }
 
-      // license optimization
       (payload.license_optimization?.selected || []).forEach(p => {
         if(p.licenses && p.licenses <= 0){
           errors.push(`Platform ${p.label}: license count must be greater than 0.`);
@@ -693,29 +659,24 @@ ${platforms ? platforms : "      - {}"}
       const costEl = row.querySelector('.fld-cost');
       const underEl = row.querySelector('.fld-underuse');
       cb.checked = true;
-      cb.dispatchEvent(new Event('change', { bubbles: true })); // enables inputs
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
       qtyEl.value = qty; costEl.value = cost; underEl.value = under;
     }
     function loadSampleValues(){
-      // Meetings
       checkAndChange(document.querySelector('#mode_room_day'));
       document.querySelector('#mtgs_per_room_day').value = 5;
       document.querySelector('#rooms_count').value = 500;
 
-      // Attendees & cost
       document.querySelector('#avg_attendees').value = 6;
       document.querySelector('#loaded_cost_hour').value = 85;
 
-      // Incidents
       checkAndChange(document.querySelector('#inc_mode_room'));
       document.querySelector('#incidents_per_room_month').value = 0.3;
       document.querySelector('#rooms_count_inc').value = 500;
 
-      // Hours
       const hrs = Array.from(document.querySelectorAll('input[name="hours"]')).find(r => r.value === '9-5 weekdays');
       checkAndChange(hrs);
 
-      // Licenses
       setPlatformSample('zoom_meetings', { qty: 10000, cost: 15, under: 10 });
       setPlatformSample('zoom_rooms',    { qty: 500,   cost: 50, under: 20 });
       setPlatformSample('zoom_phone',    { qty: 8000,  cost: 8,  under: 15 });
@@ -723,7 +684,6 @@ ${platforms ? platforms : "      - {}"}
 
       updateSavings();
 
-      // Generate outputs
       const form = document.querySelector('#intake');
       if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
       else if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
@@ -731,12 +691,12 @@ ${platforms ? platforms : "      - {}"}
       const jsonOut = document.querySelector('#jsonOut');
       if (jsonOut) jsonOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    // Attach immediately (script is at end of body)
     const sampleBtn = document.querySelector('#loadSample');
     if (sampleBtn) sampleBtn.addEventListener('click', loadSampleValues);
 
     // --- wire buttons
-    $('#intake').addEventListener('submit', (e)=>{
+    const formEl = $('#intake');
+    if (formEl) formEl.addEventListener('submit', (e)=>{
       e.preventDefault();
       const payload = makePayload();
       const { errors, warn } = validatePayload(payload);
@@ -793,5 +753,4 @@ ${platforms ? platforms : "      - {}"}
 </body>
 </html>"""
 
-# Render the intake form. Adjust height as needed when expanding instructions.
 components.html(form_html, height=2100, scrolling=True)
