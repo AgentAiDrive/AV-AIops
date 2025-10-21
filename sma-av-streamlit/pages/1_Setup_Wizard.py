@@ -619,10 +619,11 @@ ${platforms ? platforms : "      - {}"}
       };
     }
 
-    // --- validation helpers
+       // --- validation helpers
     function validatePayload(payload){
       const errors = [];
       const warn = [];
+
       // meeting volume
       const mv = payload.meeting_volume || {};
       if(mv.mode === 'per_room_per_day'){
@@ -641,20 +642,32 @@ ${platforms ? platforms : "      - {}"}
           errors.push('Employees count must be a positive number.');
         }
       }
+
+      // attendees & cost (basic sanity)
+      const att = Number(payload.avg_attendees_per_meeting);
+      if (!Number.isFinite(att) || att <= 0) {
+        errors.push('Average attendee count per meeting must be greater than 0.');
+      }
+      const cost = Number(payload.loaded_cost_per_hour_usd);
+      if (!Number.isFinite(cost) || cost < 0) {
+        errors.push('Loaded cost per hour must be 0 or greater.');
+      }
+
       // support incidents
       const inc = payload.support_incidents || {};
       if(inc.mode === 'per_room'){
-        if(!inc.incidents_per_room_per_month || inc.incidents_per_room_per_month < 0){
+        if(!isFinite(inc.incidents_per_room_per_month) || inc.incidents_per_room_per_month < 0){
           errors.push('Incidents per room per month must be non-negative.');
         }
         if(!inc.rooms_count || inc.rooms_count <= 0){
           errors.push('Rooms count for incidents must be positive.');
         }
       } else {
-        if(!inc.incidents_enterprise_per_month || inc.incidents_enterprise_per_month < 0){
+        if(!isFinite(inc.incidents_enterprise_per_month) || inc.incidents_enterprise_per_month < 0){
           errors.push('Incidents per month must be non-negative.');
         }
       }
+
       // license optimization
       (payload.license_optimization?.selected || []).forEach(p => {
         if(p.licenses && p.licenses <= 0){
@@ -669,76 +682,75 @@ ${platforms ? platforms : "      - {}"}
       });
       return { errors, warn };
     }
-  // Helper to check radios and fire change toggles
-  function checkAndChange(el){
-    if (!el) return;
-    el.checked = true;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
 
-  // Set a platform row by key; checks the box, enables inputs, sets values
-  function setPlatformSample(key, { qty=0, cost=0, under=0 } = {}){
-    const row = platRoot.querySelector(`.checkbox-row[data-plat-key="${key}"]`);
-    if(!row) return;
-    const cb = row.querySelector('input[type="checkbox"]');
-    const qtyEl = row.querySelector('.fld-qty');
-    const costEl = row.querySelector('.fld-cost');
-    const underEl = row.querySelector('.fld-underuse');
-
-    cb.checked = true;
-    cb.dispatchEvent(new Event('change', { bubbles: true })); // enables inputs
-    qtyEl.value = qty;
-    costEl.value = cost;
-    underEl.value = under;
-  }
-
-  // Load canonical demo values and auto-generate outputs
-  function loadSampleValues(){
-    // Meetings: per room per day
-    checkAndChange(document.querySelector('#mode_room_day'));
-    document.querySelector('#mtgs_per_room_day').value = 5; // typical
-    document.querySelector('#rooms_count').value = 500;
-
-    // Attendees & cost
-    document.querySelector('#avg_attendees').value = 6;
-    document.querySelector('#loaded_cost_hour').value = 85;
-
-    // Incidents: per room per month
-    checkAndChange(document.querySelector('#inc_mode_room'));
-    document.querySelector('#incidents_per_room_month').value = 0.3;
-    document.querySelector('#rooms_count_inc').value = 500;
-
-    // Hours of operation: 9–5 weekdays
-    const hrs = Array.from(document.querySelectorAll('input[name="hours"]'))
-      .find(r => r.value === '9-5 weekdays');
-    checkAndChange(hrs);
-
-    // License samples (kept modest to avoid validation warnings)
-    setPlatformSample('zoom_meetings', { qty: 10000, cost: 15, under: 10 });
-    setPlatformSample('zoom_rooms',    { qty: 500,   cost: 50, under: 20 });
-    setPlatformSample('zoom_phone',    { qty: 8000,  cost: 8,  under: 15 });
-    setPlatformSample('zoom_webinar',  { qty: 120,   cost: 90, under: 10 });
-
-    updateSavings();
-
-    // One-click: submit to generate previews
-    const form = document.querySelector('#intake');
-    if (form && typeof form.requestSubmit === 'function') {
-      form.requestSubmit();
-    } else if (form) {
-      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    // --- sample loader (NO extra <script> tag here)
+    function checkAndChange(el){
+      if (!el) return;
+      el.checked = true;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Bring results into view
-    const jsonOut = document.querySelector('#jsonOut');
-    if (jsonOut) jsonOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+    function setPlatformSample(key, { qty=0, cost=0, under=0 } = {}){
+      const row = platRoot.querySelector(`.checkbox-row[data-plat-key="${key}"]`);
+      if(!row) return;
+      const cb = row.querySelector('input[type="checkbox"]');
+      const qtyEl = row.querySelector('.fld-qty');
+      const costEl = row.querySelector('.fld-cost');
+      const underEl = row.querySelector('.fld-underuse');
+      cb.checked = true;
+      cb.dispatchEvent(new Event('change', { bubbles: true })); // enables inputs
+      qtyEl.value = qty; costEl.value = cost; underEl.value = under;
+    }
 
-  // Wire the new button
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const btn = document.querySelector('#loadSample');
-    if (btn) btn.addEventListener('click', loadSampleValues);
-  });
+    function loadSampleValues(){
+      // Meetings
+      checkAndChange(document.querySelector('#mode_room_day'));
+      document.querySelector('#mtgs_per_room_day').value = 5;
+      document.querySelector('#rooms_count').value = 500;
+
+      // Attendees & cost
+      document.querySelector('#avg_attendees').value = 6;
+      document.querySelector('#loaded_cost_hour').value = 85;
+
+      // Incidents
+      checkAndChange(document.querySelector('#inc_mode_room'));
+      document.querySelector('#incidents_per_room_month').value = 0.3;
+      document.querySelector('#rooms_count_inc').value = 500;
+
+      // Hours
+      const hrs = Array.from(document.querySelectorAll('input[name="hours"]')).find(r => r.value === '9-5 weekdays');
+      checkAndChange(hrs);
+
+      // Licenses
+      setPlatformSample('zoom_meetings', { qty: 10000, cost: 15, under: 10 });
+      setPlatformSample('zoom_rooms',    { qty: 500,   cost: 50, under: 20 });
+      setPlatformSample('zoom_phone',    { qty: 8000,  cost: 8,  under: 15 });
+      setPlatformSample('zoom_webinar',  { qty: 120,   cost: 90, under: 10 });
+
+      updateSavings();
+
+      // Generate outputs
+      const form = document.querySelector('#intake');
+      if (form && typeof form.requestSubmit === 'function') form.requestSubmit();
+      else if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+
+      const jsonOut = document.querySelector('#jsonOut');
+      if (jsonOut) jsonOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const btn = document.querySelector('#loadSample');
+      if (btn) btn.addEventListener('click', loadSampleValues);
+    });
+
+    // --- enhance downloader to support proper mime types
+    function downloadText(filename, text, mime='text/plain;charset=utf-8'){
+      const blob = new Blob([text], {type: mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
     // --- wire buttons
     $('#intake').addEventListener('submit', (e)=>{
       e.preventDefault();
@@ -746,6 +758,8 @@ ${platforms ? platforms : "      - {}"}
       const { errors, warn } = validatePayload(payload);
       const msgBox = document.querySelector('#copyState');
       msgBox.className = 'small';
+      msgBox.textContent = '';
+
       if(errors.length){
         msgBox.textContent = errors.join(' ');
         msgBox.classList.add('warn');
@@ -755,6 +769,7 @@ ${platforms ? platforms : "      - {}"}
         msgBox.textContent = warn.join(' ');
         msgBox.classList.add('warn');
       }
+
       const sop = buildSop(payload);
       const yaml = buildYaml(payload);
       document.querySelector('#jsonOut').value = JSON.stringify(sop, null, 2);
@@ -782,17 +797,12 @@ ${platforms ? platforms : "      - {}"}
     document.querySelector('#downloadSop').addEventListener('click', ()=>{
       const txt = document.querySelector('#jsonOut').value.trim();
       if(!txt){ alert('Generate first.'); return; }
-      downloadText('ipav_baseline_sop.json', txt);
+      downloadText('ipav_baseline_sop.json', txt, 'application/json;charset=utf-8');
     });
 
     document.querySelector('#downloadYaml').addEventListener('click', ()=>{
       const txt = document.querySelector('#yamlOut').value.trim();
       if(!txt){ alert('Generate first.'); return; }
-      downloadText('ipav_baseline_recipe.yaml', txt);
+      downloadText('ipav_baseline_recipe.yaml', txt, 'text/yaml;charset=utf-8');
     });
   </script>
-</body>
-</html>"""
-
-# Render the intake form.  Adjust height as needed when expanding instructions.
-components.html(form_html, height=2100, scrolling=True)
