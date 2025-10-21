@@ -161,3 +161,52 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
                         st.rerun()
 
                 cols[4].write(f"Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'} · Status: {status}")
+
+# --- Import / Export ----------------------------------------------------------
+st.divider()
+st.subheader("Import / Export")
+
+from core.io.port import export_zip, import_zip
+
+colE, colI = st.columns(2)
+
+with colE:
+    st.markdown("**Export a bundle**")
+    inc = st.multiselect(
+        "Include",
+        options=["agents", "recipes", "workflows"],
+        default=["agents", "recipes", "workflows"],
+        help="Choose the objects to include in the zip."
+    )
+    if st.button("Generate export"):
+        data, report = export_zip(include=inc, recipes_dir="recipes")
+        st.success(f"Export ready • agents={report['counts'].get('agents',0)} "
+                   f"recipes={report['counts'].get('recipes',0)} "
+                   f"workflows={report['counts'].get('workflows',0)}")
+        st.download_button(
+            label="Download .zip",
+            data=data,
+            file_name=f"sma-avops-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip",
+            mime="application/zip",
+            key="export_zip_dl",
+        )
+        with st.expander("Export report"):
+            st.json(report)
+
+with colI:
+    st.markdown("**Import a bundle**")
+    up = st.file_uploader("Upload .zip", type=["zip"])
+    merge = st.radio("Merge strategy", ["skip", "overwrite", "rename"], index=0,
+                     help="For duplicates by name: skip, overwrite in place, or keep both by renaming.")
+    dry = st.checkbox("Dry run (preview only)", value=True)
+    if up is not None and st.button("Import bundle"):
+        try:
+            b = up.read()
+            result = import_zip(b, recipes_dir="recipes", merge=merge, dry_run=dry)
+            if dry:
+                st.info("Dry run preview — no changes were written.")
+            st.json(result)
+            if not dry:
+                st.success("Import finished. Refresh the page to see changes.")
+        except Exception as e:
+            st.error(f"Import failed: {type(e).__name__}: {e}")
