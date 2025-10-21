@@ -290,18 +290,20 @@ if st.button("Initialize database & seed demo data"):
     st.success("Seed complete.")
 
 st.divider()
-st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
+st.header("📊 Baseline Workflow")
 
 st.markdown(
     """
-**What this form is for:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.
-
+**Use this form to:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.
+**Value Intake → SOP JSON → IPAV Recipe YAML**
 **How to complete the form:**
 1. Choose the **input mode** for Meetings and Support Incidents, then enter your numbers.  
 2. Fill **Average attendees per meeting** and **Loaded cost per hour**.  
 3. Select **Hours of Operation** (or provide a **Custom** string).  
 4. Under **License Optimization**, tick platforms you own and enter **license counts** (optional: cost & underuse % for savings preview).  
 5. Click **Generate** to preview, then use **Copy** or **Download** for SOP JSON and IPAV Recipe YAML.
+6. Go To **Chat** and type '/sop' then paste your baseline to generate a formatted recipe.
+7. This isn't connected to your platforms.  To use actual data from your platforms - create an agent, connect MCP's, Recipe and Workflow.
 """
 )
 
