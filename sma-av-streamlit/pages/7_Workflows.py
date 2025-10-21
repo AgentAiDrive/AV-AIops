@@ -10,6 +10,7 @@ from core.workflow.service import (
     run_now, compute_status, tick
 )
 from core.ui.page_tips import show as show_tip
+from core.io.port import export_zip, import_zip
 
 PAGE_KEY = "Workflows"
 show_tip(PAGE_KEY)
@@ -165,8 +166,6 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
 # --- Import / Export ----------------------------------------------------------
 st.divider()
 st.subheader("Import / Export")
-
-from core.io.port import export_zip, import_zip
 
 colE, colI = st.columns(2)
 
