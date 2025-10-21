@@ -32,6 +32,132 @@ show_tip(PAGE_KEY)
 
 st.title("📜 Recipes")
 
+# --- Recipes Toolbar: Drag-and-drop YAML import --------------------------------
+from __future__ import annotations
+
+import io, zipfile
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any
+
+import streamlit as st
+import yaml  # ensure PyYAML is in requirements
+from core.io.port import import_zip  # reuses your existing import/merge logic
+
+# Small helper to keep filenames sane and consistent with export/import
+def _slug(name: str) -> str:
+    s = "".join(c if (c.isalnum() or c in ("-", "_")) else "-" for c in (name or "").strip())
+    while "--" in s:
+        s = s.replace("--", "-")
+    return (s.strip("-_") or "recipe").lower()
+
+def _guess_recipe_name(text: str, fallback: str) -> str:
+    try:
+        doc = yaml.safe_load(text) or {}
+        if isinstance(doc, dict):
+            n = str(doc.get("name", "")).strip()
+            if n:
+                return n
+    except Exception:
+        pass
+    # Fallback to filename stem if no "name" key
+    return fallback
+
+def _build_zip_from_yamls(files: List["UploadedFile"]) -> bytes:
+    """
+    Build an in-memory zip:
+      - manifest.json
+      - recipes.json [{name, file}]
+      - recipes/<slug>.yaml (content from each upload)
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        index = []
+        seen_names = set()
+        for f in files:
+            raw = f.read().decode("utf-8", "replace")
+            base_name = Path(f.name).stem
+            name = _guess_recipe_name(raw, fallback=base_name)
+
+            # Deduplicate names inside one batch (import_zip also handles duplicates vs DB)
+            candidate = name
+            i = 2
+            while candidate.lower() in seen_names:
+                candidate = f"{name} ({i})"
+                i += 1
+            name = candidate
+            seen_names.add(name.lower())
+
+            fn = f"recipes/{_slug(name)}.yaml"
+            z.writestr(fn, raw)
+            index.append({"name": name, "file": fn})
+
+        # minimal manifest
+        z.writestr(
+            "manifest.json",
+            yaml.safe_dump(
+                {
+                    "package": "sma-avops-recipes-only",
+                    "version": "1.0.0",
+                    "exported_at": datetime.utcnow().isoformat() + "Z",
+                    "counts": {"recipes": len(index)},
+                    "includes": ["recipes"],
+                },
+                sort_keys=False,
+                allow_unicode=True,
+            ),
+        )
+        z.writestr("recipes.json", yaml.safe_dump(index, sort_keys=False, allow_unicode=True))
+    return buf.getvalue()
+
+st.divider()
+st.subheader("📥 Add Recipes (Drag & Drop YAML)")
+
+with st.expander("Import YAML files into the recipe library", expanded=True):
+    uploads = st.file_uploader(
+        "Drop one or more .yaml/.yml files here",
+        type=["yaml", "yml"],
+        accept_multiple_files=True,
+        help="Each file should be a valid IPAV recipe. If the YAML has a 'name:' field, that will be used."
+    )
+
+    merge = st.radio(
+        "On duplicate names in the database…",
+        options=["skip", "overwrite", "rename"],
+        index=0,
+        help="• skip: keep existing records\n• overwrite: replace existing YAML/content\n• rename: keep both by appending (2), (3)…",
+        horizontal=True,
+    )
+    colA, colB = st.columns(2)
+    with colA:
+        dry = st.checkbox("Dry run (preview only)", value=True)
+    with colB:
+        st.caption("Tip: Start with a **Dry run** to see what would change before applying.")
+
+    def _run_import(dry_run: bool):
+        if not uploads:
+            st.warning("Add at least one YAML file to continue.")
+            return
+        try:
+            zip_bytes = _build_zip_from_yamls(uploads)
+            result = import_zip(zip_bytes, recipes_dir="recipes", merge=merge, dry_run=dry_run)
+            st.json(result, expanded=False)
+            if not dry_run:
+                st.success("Recipes imported successfully.")
+                st.toast("Recipes imported; refreshing…")
+                st.rerun()
+        except Exception as e:
+            st.error(f"Import failed: {type(e).__name__}: {e}")
+
+    c1, c2 = st.columns([1, 1])
+    if c1.button("Preview import (Dry run)"):
+        _run_import(dry_run=True)
+    if c2.button("Import now"):
+        _run_import(dry_run=dry)
+
+st.caption("Files are saved to the local **recipes/** folder and registered in the database so they appear in this page and in Workflows.")
+# --- End Recipes Toolbar ------------------------------------------------------
+
 # Directory where recipe YAML files are stored.  It is created on demand.
 RECIPES_DIR = os.path.join(os.getcwd(), "recipes")
 os.makedirs(RECIPES_DIR, exist_ok=True)
