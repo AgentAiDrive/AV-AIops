@@ -232,6 +232,7 @@ form_html = """<!doctype html>
       <div class="card">
         <h2>Finish</h2>
         <div class="btns" style="margin-bottom:10px;">
+          <button type="button" id="loadSample">Load sample values (500 rooms / 10k employees)</button>
           <button type="submit" class="primary">Generate (Preview JSON & YAML)</button>
           <button type="button" id="copyJson">Copy JSON</button>
           <button type="button" id="downloadSop">Download SOP JSON</button>
@@ -668,6 +669,78 @@ ${platforms ? platforms : "      - {}"}
       });
       return { errors, warn };
     }
+<script>
+  // Helper to check radios and fire change toggles
+  function checkAndChange(el){
+    if (!el) return;
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Set a platform row by key; checks the box, enables inputs, sets values
+  function setPlatformSample(key, { qty=0, cost=0, under=0 } = {}){
+    const row = platRoot.querySelector(`.checkbox-row[data-plat-key="${key}"]`);
+    if(!row) return;
+    const cb = row.querySelector('input[type="checkbox"]');
+    const qtyEl = row.querySelector('.fld-qty');
+    const costEl = row.querySelector('.fld-cost');
+    const underEl = row.querySelector('.fld-underuse');
+
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change', { bubbles: true })); // enables inputs
+    qtyEl.value = qty;
+    costEl.value = cost;
+    underEl.value = under;
+  }
+
+  // Load canonical demo values and auto-generate outputs
+  function loadSampleValues(){
+    // Meetings: per room per day
+    checkAndChange(document.querySelector('#mode_room_day'));
+    document.querySelector('#mtgs_per_room_day').value = 5; // typical
+    document.querySelector('#rooms_count').value = 500;
+
+    // Attendees & cost
+    document.querySelector('#avg_attendees').value = 6;
+    document.querySelector('#loaded_cost_hour').value = 85;
+
+    // Incidents: per room per month
+    checkAndChange(document.querySelector('#inc_mode_room'));
+    document.querySelector('#incidents_per_room_month').value = 0.3;
+    document.querySelector('#rooms_count_inc').value = 500;
+
+    // Hours of operation: 9–5 weekdays
+    const hrs = Array.from(document.querySelectorAll('input[name="hours"]'))
+      .find(r => r.value === '9-5 weekdays');
+    checkAndChange(hrs);
+
+    // License samples (kept modest to avoid validation warnings)
+    setPlatformSample('zoom_meetings', { qty: 10000, cost: 15, under: 10 });
+    setPlatformSample('zoom_rooms',    { qty: 500,   cost: 50, under: 20 });
+    setPlatformSample('zoom_phone',    { qty: 8000,  cost: 8,  under: 15 });
+    setPlatformSample('zoom_webinar',  { qty: 120,   cost: 90, under: 10 });
+
+    updateSavings();
+
+    // One-click: submit to generate previews
+    const form = document.querySelector('#intake');
+    if (form && typeof form.requestSubmit === 'function') {
+      form.requestSubmit();
+    } else if (form) {
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+
+    // Bring results into view
+    const jsonOut = document.querySelector('#jsonOut');
+    if (jsonOut) jsonOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Wire the new button
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const btn = document.querySelector('#loadSample');
+    if (btn) btn.addEventListener('click', loadSampleValues);
+  });
+</script>
 
     // --- wire buttons
     $('#intake').addEventListener('submit', (e)=>{
