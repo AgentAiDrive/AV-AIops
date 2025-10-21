@@ -12,16 +12,17 @@ import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-
-import streamlit as st
-
 from core.db.models import Recipe
 from core.db.session import get_session
 from core.recipes.service import load_recipe_dict, save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
 from core.runs_store import RunStore
 from core.ui.page_tips import show as show_tip
-
+import io, zipfile
+from typing import List, Dict, Any
+import streamlit as st
+import yaml  # ensure PyYAML is in requirements
+from core.io.port import import_zip  # reuses your existing import/merge logic
 
 # -----------------------------------------------------------------------------
 # Page setup
@@ -34,15 +35,6 @@ st.title("📜 Recipes")
 
 # --- Recipes Toolbar: Drag-and-drop YAML import --------------------------------
 from __future__ import annotations
-
-import io, zipfile
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any
-
-import streamlit as st
-import yaml  # ensure PyYAML is in requirements
-from core.io.port import import_zip  # reuses your existing import/merge logic
 
 # Small helper to keep filenames sane and consistent with export/import
 def _slug(name: str) -> str:
