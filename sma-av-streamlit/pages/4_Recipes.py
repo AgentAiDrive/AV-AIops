@@ -1,13 +1,12 @@
 """
-Recipes page for the Streamlit AV operations assistant.
-
+Recipes page for the AV operations assistant.
 This script provides a UI for creating, viewing and editing YAML recipes
 that encode operational workflows.  Guardrails (timeouts, rollback
 actions and success metrics) help avoid runaway automation and should be
 included in every recipe.  The page also displays success metrics for
 previous runs and integrates with version control to surface git hints.
 """
-
+from __future__ import annotations  # <-- must be here (after docstring)
 import os
 import subprocess
 from datetime import datetime
@@ -34,9 +33,7 @@ show_tip(PAGE_KEY)
 st.title("📜 Recipes")
 
 # --- Recipes Toolbar: Drag-and-drop YAML import --------------------------------
-from __future__ import annotations
 
-# Small helper to keep filenames sane and consistent with export/import
 def _slug(name: str) -> str:
     s = "".join(c if (c.isalnum() or c in ("-", "_")) else "-" for c in (name or "").strip())
     while "--" in s:
@@ -52,26 +49,26 @@ def _guess_recipe_name(text: str, fallback: str) -> str:
                 return n
     except Exception:
         pass
-    # Fallback to filename stem if no "name" key
-    return fallback
+    return fallback  # fallback to filename stem
 
 def _build_zip_from_yamls(files: List["UploadedFile"]) -> bytes:
     """
-    Build an in-memory zip:
-      - manifest.json
-      - recipes.json [{name, file}]
-      - recipes/<slug>.yaml (content from each upload)
+    Build an in-memory zip compatible with core.io.port.import_zip:
+      - manifest.json (JSON)
+      - recipes.json  (JSON: [{name, file}])
+      - recipes/<slug>.yaml (the uploaded content)
     """
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        index = []
+        index: List[Dict[str, str]] = []
         seen_names = set()
+
         for f in files:
             raw = f.read().decode("utf-8", "replace")
             base_name = Path(f.name).stem
             name = _guess_recipe_name(raw, fallback=base_name)
 
-            # Deduplicate names inside one batch (import_zip also handles duplicates vs DB)
+            # de-dupe names within the same batch
             candidate = name
             i = 2
             while candidate.lower() in seen_names:
@@ -84,22 +81,16 @@ def _build_zip_from_yamls(files: List["UploadedFile"]) -> bytes:
             z.writestr(fn, raw)
             index.append({"name": name, "file": fn})
 
-        # minimal manifest
-        z.writestr(
-            "manifest.json",
-            yaml.safe_dump(
-                {
-                    "package": "sma-avops-recipes-only",
-                    "version": "1.0.0",
-                    "exported_at": datetime.utcnow().isoformat() + "Z",
-                    "counts": {"recipes": len(index)},
-                    "includes": ["recipes"],
-                },
-                sort_keys=False,
-                allow_unicode=True,
-            ),
-        )
-        z.writestr("recipes.json", yaml.safe_dump(index, sort_keys=False, allow_unicode=True))
+        manifest = {
+            "package": "sma-avops-recipes-only",
+            "version": "1.0.0",
+            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "counts": {"recipes": len(index)},
+            "includes": ["recipes"],
+        }
+        # Write REAL JSON (import_zip expects JSON)
+        z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        z.writestr("recipes.json", json.dumps(index, ensure_ascii=False, indent=2))
     return buf.getvalue()
 
 st.divider()
@@ -147,7 +138,7 @@ with st.expander("Import YAML files into the recipe library", expanded=True):
     if c2.button("Import now"):
         _run_import(dry_run=dry)
 
-st.caption("Files are saved to the local **recipes/** folder and registered in the database so they appear in this page and in Workflows.")
+st.caption("Files are saved to the local **recipes/** folder and registered in the database so they appear here and in Workflows.")
 # --- End Recipes Toolbar ------------------------------------------------------
 
 # Directory where recipe YAML files are stored.  It is created on demand.
