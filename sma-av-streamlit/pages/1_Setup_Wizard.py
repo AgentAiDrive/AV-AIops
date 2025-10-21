@@ -36,6 +36,7 @@ st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 # generate the SOP JSON and YAML outputs.  At the bottom of the script we
 # insert a validation function and modify the submit handler to perform
 # validation before generating the outputs.
+
 form_html = """<!doctype html>
 <html lang="en">
 <head>
@@ -806,3 +807,5 @@ ${platforms ? platforms : "      - {}"}
       downloadText('ipav_baseline_recipe.yaml', txt, 'text/yaml;charset=utf-8');
     });
   </script>
+</body> 
+</html>"""
