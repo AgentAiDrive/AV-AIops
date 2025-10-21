@@ -4,38 +4,11 @@ from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ✅ your imports
+# ✅ keep your imports
 from core.db.seed import seed_demo
 from core.ui.page_tips import show as show_tip
 
-# ---- Page header / tip ----
-PAGE_KEY = "Setup Wizard"
-show_tip(PAGE_KEY)
-
-st.title("🏁 Setup Wizard")
-st.write("Initialize database, seed demo agents, tools, and recipes.")
-
-if st.button("Initialize database & seed demo data"):
-    seed_demo()
-    st.success("Seed complete.")
-
-st.divider()
-st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
-
-st.caption(
-    "**What this form is for:** Capture your AV environment’s meeting volume, costs, "
-    "support incidents, hours of operation, and license inventory so the app can auto-generate "
-    "an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.\n\n"
-    "**How to complete the form:**\n"
-    "1) Choose the **input mode** for Meetings and Support Incidents, then enter your numbers.\n"
-    "2) Fill **Average attendees per meeting** and **Loaded cost per hour**.\n"
-    "3) Select **Hours of Operation** (or provide a **Custom** string).\n"
-    "4) Under **License Optimization**, tick platforms you own and enter **license counts** "
-    "(optional: cost & underuse % for savings preview).\n"
-    "5) Click **Generate** to preview, then use **Copy** or **Download** for SOP JSON and IPAV Recipe YAML."
-)
-
-# ---------- helpers ----------
+# ---------- constants ----------
 DEFAULT_PLATFORMS = [
     {"key": "zoom_meetings", "label": "Zoom Meetings"},
     {"key": "zoom_rooms", "label": "Zoom Rooms"},
@@ -47,6 +20,7 @@ DEFAULT_PLATFORMS = [
     {"key": "google_meet", "label": "Google Meet add-ons"},
 ]
 
+# ---------- utils ----------
 def yaml_escape(s: str) -> str:
     return (s or "").replace('"', '\\"')
 
@@ -304,127 +278,186 @@ def validate(payload: dict):
             warns.append(f'{p.get("label")}: underuse > 25%; consider reducing licenses.')
     return errors, warns
 
-# ---------- form ----------
-with st.form("intake"):
-    st.subheader("Meeting Volume")
-    meet_mode = st.radio(
-        "Average meetings input mode",
-        ["per_room_per_day", "enterprise_per_month"],
-        format_func=lambda v: "Per room • per day" if v == "per_room_per_day" else "Enterprise • per month",
-        horizontal=True,
-    )
+# ---------- page header ----------
+PAGE_KEY = "Setup Wizard"
+show_tip(PAGE_KEY)
 
-    c1, c2 = st.columns(2)
-    if meet_mode == "per_room_per_day":
-        avg_mtgs = c1.number_input("Avg meetings / room / day", min_value=0.0, max_value=24.0, step=0.1, value=5.0)
-        rooms_count = c2.number_input("Rooms in scope", min_value=1, step=1, value=500)
-        mv_payload = {
-            "mode": meet_mode,
-            "avg_meetings_per_room_per_day": avg_mtgs,
-            "rooms_count": rooms_count,
-        }
-    else:
-        total_mtgs = c1.number_input("Total meetings / month (enterprise)", min_value=0, step=100, value=80000)
-        employees = c2.number_input("Employees in scope", min_value=1, step=100, value=10000)
-        mv_payload = {
-            "mode": meet_mode,
-            "meetings_enterprise_per_month": total_mtgs,
-            "employees_count": employees,
-        }
+st.title("🏁 Setup Wizard")
+st.write("Initialize database, seed demo agents, tools, and recipes.")
 
-    c3, c4 = st.columns(2)
-    avg_attendees = c3.number_input("Average attendee count per meeting", min_value=1, step=1, value=6)
-    loaded_cost = c4.number_input("Average loaded cost per hour per employee (USD)", min_value=0, step=1, value=85)
+if st.button("Initialize database & seed demo data"):
+    seed_demo()
+    st.success("Seed complete.")
 
-    st.subheader("Support Incidents")
-    inc_mode = st.radio(
-        "Incidents input mode",
-        ["per_room", "enterprise"],
-        format_func=lambda v: "Per room • per month" if v == "per_room" else "Enterprise • per month",
-        horizontal=True,
-    )
+st.divider()
+st.header("📊 Value Intake → SOP JSON → IPAV Recipe YAML")
 
-    if inc_mode == "per_room":
-        d1, d2 = st.columns(2)
-        inc_per_room = d1.number_input("Estimated incidents / room / month", min_value=0.0, step=0.1, value=0.3)
-        rooms_count_inc = d2.number_input("Rooms in scope (incidents)", min_value=1, step=1, value=500)
-        inc_payload = {
-            "mode": inc_mode,
-            "incidents_per_room_per_month": inc_per_room,
-            "rooms_count": rooms_count_inc,
-        }
-    else:
-        d1, d2 = st.columns(2)
-        inc_ent = d1.number_input("Estimated incidents / month (enterprise)", min_value=0, step=1, value=150)
-        rooms_ref = d2.number_input("Rooms in scope (reference)", min_value=1, step=1, value=500)
-        inc_payload = {
-            "mode": inc_mode,
-            "incidents_enterprise_per_month": inc_ent,
-            "rooms_count_reference": rooms_ref,
-        }
+st.markdown(
+    """
+**What this form is for:** Capture your AV environment’s meeting volume, costs, support incidents, hours of operation, and license inventory so the app can auto-generate an **SOP JSON** and an **IPAV Recipe YAML** for a “Baseline Capture” workflow.
 
-    st.subheader("Hours of Operation")
-    hours_choice = st.radio("Select one", ["9-5 weekdays", "7-7 weekdays", "24x5", "24x7", "custom"], horizontal=True)
-    hours_custom = ""
-    if hours_choice == "custom":
-        hours_custom = st.text_input("Custom hours (e.g., 6–8 (Mon–Sat))", value="")
-    hours_value = hours_custom if hours_choice == "custom" else hours_choice
+**How to complete the form:**
+1. Choose the **input mode** for Meetings and Support Incidents, then enter your numbers.  
+2. Fill **Average attendees per meeting** and **Loaded cost per hour**.  
+3. Select **Hours of Operation** (or provide a **Custom** string).  
+4. Under **License Optimization**, tick platforms you own and enter **license counts** (optional: cost & underuse % for savings preview).  
+5. Click **Generate** to preview, then use **Copy** or **Download** for SOP JSON and IPAV Recipe YAML.
+"""
+)
 
-    st.subheader("License Optimization Candidates")
-    sel = []
-    with st.expander("Add / edit platforms"):
-        for plat in DEFAULT_PLATFORMS:
-            on = st.checkbox(plat["label"], key=f"plat_{plat['key']}")
-            if on:
-                q1, q2, q3 = st.columns(3)
-                qty = q1.number_input(f"Licenses — {plat['label']}", min_value=0, step=1, value=0, key=f"qty_{plat['key']}")
-                cost = q2.number_input(
-                    f"Monthly $ / license — {plat['label']}", min_value=0.0, step=1.0, value=0.0, key=f"cost_{plat['key']}"
-                )
-                under = q3.number_input(
-                    f"Underuse % — {plat['label']}", min_value=0, max_value=100, step=1, value=0, key=f"under_{plat['key']}"
-                )
-                sel.append(
-                    {
-                        "key": plat["key"],
-                        "label": plat["label"],
-                        "licenses": int(qty),
-                        "monthly_cost_per_license_usd": float(cost) if cost else None,
-                        "underuse_percent": int(under) if under else None,
-                    }
-                )
+# ---------- session for custom platforms ----------
+if "custom_platforms" not in st.session_state:
+    st.session_state.custom_platforms = []
 
-    est_savings = sum(
-        (p.get("licenses") or 0)
-        * (p.get("monthly_cost_per_license_usd") or 0)
-        * ((p.get("underuse_percent") or 0) / 100.0)
-        for p in sel
-    )
-    st.info(f"Est. reclaimable (monthly): **${est_savings:,.0f}**")
+# =========================================================
+# MEETING VOLUME (live widgets; no st.form → instant updates)
+# =========================================================
+st.subheader("Meeting Volume")
+meet_mode = st.radio(
+    "Average meetings input mode",
+    ["per_room_per_day", "enterprise_per_month"],
+    format_func=lambda v: "Per room • per day" if v == "per_room_per_day" else "Enterprise • per month",
+    horizontal=True,
+)
 
-    submitted = st.form_submit_button("Generate (Preview JSON & YAML)")
+c1, c2 = st.columns(2)
+if meet_mode == "per_room_per_day":
+    avg_mtgs = c1.number_input("Avg meetings / room / day", min_value=0.0, max_value=24.0, step=0.1, value=5.0)
+    rooms_count = c2.number_input("Rooms in scope", min_value=1, step=1, value=500)
+    mv_payload = {"mode": meet_mode, "avg_meetings_per_room_per_day": avg_mtgs, "rooms_count": rooms_count}
+else:
+    total_mtgs = c1.number_input("Total meetings / month (enterprise)", min_value=0, step=100, value=80000)
+    employees = c2.number_input("Employees in scope", min_value=1, step=100, value=10000)
+    mv_payload = {"mode": meet_mode, "meetings_enterprise_per_month": total_mtgs, "employees_count": employees}
 
-# ---------- build / validate / preview ----------
-if submitted:
+c3, c4 = st.columns(2)
+avg_attendees = c3.number_input("Average attendee count per meeting", min_value=1, step=1, value=6)
+loaded_cost = c4.number_input("Average loaded cost per hour per employee (USD)", min_value=0, step=1, value=85)
+
+# =========================================================
+# SUPPORT INCIDENTS
+# =========================================================
+st.subheader("Support Incidents")
+inc_mode = st.radio(
+    "Incidents input mode",
+    ["per_room", "enterprise"],
+    format_func=lambda v: "Per room • per month" if v == "per_room" else "Enterprise • per month",
+    horizontal=True,
+)
+
+if inc_mode == "per_room":
+    d1, d2 = st.columns(2)
+    inc_per_room = d1.number_input("Estimated incidents / room / month", min_value=0.0, step=0.1, value=0.3)
+    rooms_count_inc = d2.number_input("Rooms in scope (incidents)", min_value=1, step=1, value=500)
+    inc_payload = {"mode": inc_mode, "incidents_per_room_per_month": inc_per_room, "rooms_count": rooms_count_inc}
+else:
+    d1, d2 = st.columns(2)
+    inc_ent = d1.number_input("Estimated incidents / month (enterprise)", min_value=0, step=1, value=150)
+    rooms_ref = d2.number_input("Rooms in scope (reference)", min_value=1, step=1, value=500)
+    inc_payload = {"mode": inc_mode, "incidents_enterprise_per_month": inc_ent, "rooms_count_reference": rooms_ref}
+
+# =========================================================
+# HOURS OF OPERATION
+# =========================================================
+st.subheader("Hours of Operation")
+hours_choice = st.radio("Select one", ["9-5 weekdays", "7-7 weekdays", "24x5", "24x7", "custom"], horizontal=True)
+hours_custom = ""
+if hours_choice == "custom":
+    hours_custom = st.text_input("Custom hours (e.g., 6–8 (Mon–Sat))", value="")
+hours_value = hours_custom if hours_choice == "custom" else hours_choice
+
+# =========================================================
+# LICENSE OPTIMIZATION
+# =========================================================
+st.subheader("License Optimization Candidates")
+
+# Custom platform adder
+with st.expander("Add a custom platform"):
+    new_name = st.text_input("Custom platform name (e.g., BlueJeans Events)", value="", key="new_plat_name")
+    add_col1, add_col2 = st.columns([1, 3])
+    if add_col1.button("➕ Add platform"):
+        n = new_name.strip()
+        if n:
+            key = n.lower().replace(" ", "_").replace("/", "_")
+            # avoid duplicates by key
+            if key not in {p["key"] for p in st.session_state.custom_platforms} and key not in {p["key"] for p in DEFAULT_PLATFORMS}:
+                st.session_state.custom_platforms.append({"key": key, "label": n})
+                st.success(f"Added: {n}")
+            else:
+                st.warning("That platform already exists.")
+        else:
+            st.warning("Enter a platform name first.")
+
+platforms = DEFAULT_PLATFORMS + st.session_state.custom_platforms
+
+# Dynamic per-platform controls
+selected_platforms = []
+for plat in platforms:
+    enabled = st.checkbox(plat["label"], key=f"plat_{plat['key']}")
+    if enabled:
+        q1, q2, q3 = st.columns(3)
+        qty = q1.number_input(f"Licenses — {plat['label']}", min_value=0, step=1, value=0, key=f"qty_{plat['key']}")
+        cost = q2.number_input(
+            f"Monthly $ / license — {plat['label']}", min_value=0.0, step=1.0, value=0.0, key=f"cost_{plat['key']}"
+        )
+        under = q3.number_input(
+            f"Underuse % — {plat['label']}", min_value=0, max_value=100, step=1, value=0, key=f"under_{plat['key']}"
+        )
+        selected_platforms.append(
+            {
+                "key": plat["key"],
+                "label": plat["label"],
+                "licenses": int(qty),
+                "monthly_cost_per_license_usd": float(cost) if cost else None,
+                "underuse_percent": int(under) if under else None,
+            }
+        )
+
+# Real-time savings preview
+est_savings = sum(
+    (p.get("licenses") or 0)
+    * (p.get("monthly_cost_per_license_usd") or 0)
+    * ((p.get("underuse_percent") or 0) / 100.0)
+    for p in selected_platforms
+)
+st.info(f"**Est. reclaimable (monthly): ${est_savings:,.0f}**")
+
+# =========================================================
+# ACTIONS: Generate / Reset
+# =========================================================
+col_a, col_b = st.columns([1, 1])
+generate_clicked = col_a.button("Generate (Preview JSON & YAML)")
+reset_clicked = col_b.button("Reset selections")
+
+if reset_clicked:
+    # reset only platform selections/inputs; keep the rest
+    for plat in platforms:
+        st.session_state[f"plat_{plat['key']}"] = False
+        for suffix in ("qty", "cost", "under"):
+            st.session_state[f"{suffix}_{plat['key']}"] = 0
+    st.rerun()
+
+# =========================================================
+# BUILD + VALIDATE + PREVIEW
+# =========================================================
+if generate_clicked:
     payload = {
         "meeting_volume": mv_payload,
         "avg_attendees_per_meeting": int(avg_attendees),
         "loaded_cost_per_hour_usd": int(loaded_cost),
         "support_incidents": inc_payload,
         "hours_of_operation": hours_value,
-        "license_optimization": {"selected": sel, "est_monthly_savings": est_savings},
+        "license_optimization": {"selected": selected_platforms, "est_monthly_savings": est_savings},
         "environment_defaults": {"rooms": 500, "employees": 10000, "stacks": ["Zoom", "Q-SYS", "Crestron", "Logitech"]},
         "meta": {"generated_at": datetime.utcnow().isoformat(), "schema_version": "1.0.0"},
     }
 
-    # validate
     errors, warns = validate(payload)
     if errors:
         st.error("• " + "\n• ".join(errors))
     if warns:
         st.warning("• " + "\n• ".join(warns))
 
-    # preview + actions
     if not errors:
         sop = build_sop(payload)
         yaml_txt = build_yaml(payload)
@@ -437,11 +470,12 @@ if submitted:
             st.download_button("Download SOP JSON", json_txt, file_name="ipav_baseline_sop.json", mime="application/json")
             components.html(
                 f"""
-                <button onclick='navigator.clipboard.writeText({json.dumps(json_txt)}).then(()=>{{this.innerText="Copied ✓"; setTimeout(()=>this.innerText="Copy JSON",1500)}})'>
+                <button style="padding:8px 12px;border:1px solid #ccc;border-radius:8px;cursor:pointer"
+                    onclick='navigator.clipboard.writeText({json.dumps(json_txt)}).then(()=>{{this.innerText="Copied ✓"; setTimeout(()=>this.innerText="Copy JSON",1500)}})'>
                   Copy JSON
                 </button>
                 """,
-                height=40,
+                height=48,
             )
 
         with t2:
@@ -451,9 +485,10 @@ if submitted:
             )
             components.html(
                 f"""
-                <button onclick='navigator.clipboard.writeText({json.dumps(yaml_txt)}).then(()=>{{this.innerText="Copied ✓"; setTimeout(()=>this.innerText="Copy YAML",1500)}})'>
+                <button style="padding:8px 12px;border:1px solid #ccc;border-radius:8px;cursor:pointer"
+                    onclick='navigator.clipboard.writeText({json.dumps(yaml_txt)}).then(()=>{{this.innerText="Copied ✓"; setTimeout(()=>this.innerText="Copy YAML",1500)}})'>
                   Copy YAML
                 </button>
                 """,
-                height=40,
+                height=48,
             )
