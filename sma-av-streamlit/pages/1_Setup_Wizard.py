@@ -283,7 +283,7 @@ PAGE_KEY = "Setup Wizard"
 show_tip(PAGE_KEY)
 
 st.title("🏁 Setup Wizard")
-st.write("Initialize database, seed demo agents, tools, and recipes.")
+st.write("→ → **Click Button** to Initialize the database, seed demo agents, tools, and recipes.")
 
 if st.button("Initialize database & seed demo data"):
     seed_demo()
