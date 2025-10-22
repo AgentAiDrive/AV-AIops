@@ -167,17 +167,12 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
 
 # --- Import to Writable Directory - Create Directory----------------------------------------------------------
 
+# --- Import / Export ----------------------------------------------------------
 st.divider()
 st.subheader("Import / Export")
 
-# Writable location for imported recipe files (repo mount may be read-only)
 USER_RECIPES_DIR = Path.home() / ".sma_avops" / "recipes"
 USER_RECIPES_DIR.mkdir(parents=True, exist_ok=True)
-
-# --- Import / Export ----------------------------------------------------------
-
-st.divider()
-st.subheader("Import / Export")
 
 colE, colI = st.columns(2)
 
@@ -191,9 +186,11 @@ with colE:
     )
     if st.button("Generate export"):
         data, report = export_zip(include=inc, recipes_dir="recipes")
-        st.success(f"Export ready • agents={report['counts'].get('agents',0)} "
-                   f"recipes={report['counts'].get('recipes',0)} "
-                   f"workflows={report['counts'].get('workflows',0)}")
+        st.success(
+            f"Export ready • agents={report['counts'].get('agents',0)} "
+            f"recipes={report['counts'].get('recipes',0)} "
+            f"workflows={report['counts'].get('workflows',0)}"
+        )
         st.download_button(
             label="Download .zip",
             data=data,
@@ -207,20 +204,25 @@ with colE:
 with colI:
     st.markdown("**Import a bundle**")
     up = st.file_uploader("Upload .zip", type=["zip"])
-    merge = st.radio("Merge strategy", ["skip", "overwrite", "rename"], index=0,
-                     help="For duplicates by name: skip, overwrite in place, or keep both by renaming.")
+    merge = st.radio(
+        "Merge strategy", ["skip", "overwrite", "rename"], index=0,
+        help="For duplicates by name: skip, overwrite in place, or keep both by renaming."
+    )
     dry = st.checkbox("Dry run (preview only)", value=False)
     if up is not None and st.button("Import bundle"):
         try:
             b = up.read()
-            result = import_zip(b, recipes_dir=str(USER_RECIPES_DIR), merge=merge, dry_run=dry)
+            result = import_zip(
+                b,
+                recipes_dir=str(USER_RECIPES_DIR),  # ← guaranteed-writable path
+                merge=merge,
+                dry_run=dry,
+            )
             st.json(result)
             if dry:
                 st.info("Dry run preview — no changes were written.")
             else:
                 st.success("Import finished. Refreshing…")
-                st.rerun()  # <— add this
+                st.rerun()
         except Exception as e:
             st.error(f"Import failed: {type(e).__name__}: {e}")
-
-          
