@@ -1,0 +1,217 @@
+name: Generic_AV_Operational_Workflow
+version: "1.0"
+description: |
+  A robust, production‑ready AV operations workflow orchestrated across multiple
+  fixed agents.  This workflow coordinates Baseline, Intake, Plan, Act,
+  Verify, and Learn phases to deliver end‑to‑end automation for enterprise
+  AV service operations.  It is designed to serve as a template for
+  real‑world scenarios such as hybrid meeting rooms, live events and
+  refresh projects.  Roles and approvals are defined to ensure that
+  privileged actions are reviewed by appropriate personnel.
+
+roles:
+  Support_L1: "AV help desk technician"
+  Support_L2: "Senior AV engineer"
+  Network_Admin: "Network operations owner"
+  Producer: "Event producer or meeting coordinator"
+
+agents:
+  - BaselineAgent
+  - IntakeAgent
+  - PlanAgent
+  - ActAgent
+  - VerifyAgent
+  - LearnAgent
+
+# Tools (MCP endpoints) required by this workflow.  All tools referenced in the
+# fixed‑agent recipes must be listed here.  They represent external systems
+# such as Q‑SYS, Dante, Zoom Rooms, Slack, ServiceNow, network switches and
+# custom metrics services.
+mcp_required:
+  - qsys_api
+  - dante_ctrl
+  - zoom_admin
+  - network_api
+  - slack
+  - servicenow
+  - metrics_api
+
+# Profiles provide context that can be referenced in recipes via the
+# $context variable.  For example, the default room type and network
+# identifiers can be overridden at run time by the orchestrator when
+# triggering the workflow.
+profiles:
+  default_room_type: medium_conference_room
+  default_device_type: qsys_core
+
+steps_by_agent:
+  BaselineAgent:
+    - id: check_policy_window
+      call: policy_check
+      args:
+        windows: ["06:00-22:00"]
+        days: [Mon, Tue, Wed, Thu, Fri]
+      evidence: ["json:policy_window"]
+    - id: ensure_roles_present
+      call: role_check
+      args:
+        required_roles: [Support_L1, Support_L2, Network_Admin]
+      evidence: ["json:role_check"]
+    - id: ensure_secrets_loaded
+      call: secrets_api.check_secrets
+      args:
+        secrets: [qsys_token, dante_token, zoom_token, servicenow_token]
+      evidence: ["json:secrets_check"]
+
+  IntakeAgent:
+    - id: gather_zoom_health
+      call: zoom_admin.get_room_health
+      args:
+        room: "$context.room_id"
+      evidence: ["json:zoom_health"]
+    - id: gather_qsys_status
+      call: qsys_api.get_device_status
+      args:
+        device_id: "$context.device_id"
+      evidence: ["json:qsys_status"]
+    - id: gather_dante_status
+      call: dante_ctrl.get_routes
+      args:
+        device: "$context.device_id"
+      evidence: ["json:dante_status"]
+    - id: gather_network_metrics
+      call: network_api.get_port_metrics
+      args:
+        switch: "$context.switch"
+        port: "$context.port"
+      evidence: ["json:network_metrics"]
+
+  PlanAgent:
+    - id: select_procedure
+      call: choose_recipe
+      args:
+        candidates: [Device_Reset, Network_QoS_Adjustment, Reboot_Room]
+      evidence: ["json:recipe_choice"]
+    - id: insert_required_approvals
+      call: insert_approvals
+      args:
+        roles_required: [Support_L2, Network_Admin]
+      evidence: ["json:approvals_inserted"]
+    - id: expand_parameters
+      call: expand_parameters
+      args:
+        room_profile: "$context.room_type"
+        device_profile: "$context.device_type"
+      evidence: ["json:parameters_expanded"]
+
+  ActAgent:
+    - id: reset_qsys_device
+      call: qsys_api.load_snapshot
+      args:
+        device_id: "$context.device_id"
+        snapshot: FactoryReset
+      approvals: [Support_L2]
+      evidence: ["json:qsys_reset"]
+    - id: reroute_dante_audio
+      call: dante_ctrl.ensure_route
+      args:
+        tx: "$context.tx"
+        rx: "$context.rx"
+      approvals: [Support_L1]
+      evidence: ["json:dante_route"]
+    - id: reboot_zoom_room
+      call: zoom_admin.reboot_room
+      args:
+        room: "$context.room_id"
+      approvals: [Support_L2]
+      evidence: ["json:zoom_reboot"]
+    - id: adjust_network_qos
+      call: network_api.set_qos
+      args:
+        switch: "$context.switch"
+        port: "$context.port"
+        qos_policy: "$context.qos_policy"
+      approvals: [Network_Admin]
+      evidence: ["json:network_qos_set"]
+    - id: send_slack_update
+      call: slack.post_message
+      args:
+        channel: "#av-operations"
+        text: "Actions executed for room $context.room_id. See run $run_id for details."
+      evidence: ["json:slack_update"]
+    - id: create_servicenow_incident
+      call: servicenow.create_incident
+      args:
+        title: "AV workflow actions for $context.room_id"
+        description: "A workflow has executed actions; check attachments for evidence."
+        urgency: Medium
+      evidence: ["json:servicenow_incident"]
+
+  VerifyAgent:
+    - id: confirm_qsys_operational
+      call: qsys_api.verify_device_state
+      args:
+        device_id: "$context.device_id"
+        expected_state: Operational
+      evidence: ["json:qsys_verify"]
+    - id: confirm_dante_routes
+      call: dante_ctrl.verify_route
+      args:
+        tx: "$context.tx"
+        rx: "$context.rx"
+      evidence: ["json:dante_verify"]
+    - id: confirm_network_performance
+      call: network_api.verify_metrics
+      args:
+        switch: "$context.switch"
+        port: "$context.port"
+        thresholds:
+          jitter_ms: 5
+          packet_loss_percent: 0.1
+          latency_ms: 10
+      evidence: ["json:network_verify"]
+    - id: confirm_zoom_status
+      call: zoom_admin.get_room_health
+      args:
+        room: "$context.room_id"
+      evidence: ["json:zoom_verify"]
+    - id: post_verification_update
+      call: slack.post_message
+      args:
+        channel: "#av-operations"
+        text: "Verification complete for room $context.room_id. All systems operational."
+      evidence: ["json:verify_slack"]
+
+  LearnAgent:
+    - id: publish_kb_report
+      call: servicenow.create_kb
+      args:
+        title: "AV workflow report for $context.room_id"
+        html: |
+          <h2>Workflow Summary</h2>
+          <p>The workflow run $run_id executed successfully. All actions were performed and all verifications passed.</p>
+          <h3>Evidence</h3>
+          <p>Refer to the attached artifacts for detailed logs and telemetry.</p>
+        tags: [av, workflow, report]
+      evidence: ["json:kb_creation"]
+    - id: record_run_metrics
+      call: metrics_api.record_run
+      args:
+        workflow: Generic_AV_Operational_Workflow
+        run_id: "$run_id"
+        status: success
+      evidence: ["json:metrics_record"]
+    - id: announce_completion
+      call: slack.post_message
+      args:
+        channel: "#av-operations"
+        text: "Knowledge base and metrics updated for run $run_id."
+      evidence: ["json:learn_slack"]
+
+# Explicit approvals keyed by phase.  Additional per‑step approvals are declared in
+# the ActAgent steps themselves.  These phase approvals will be required
+# before the orchestrator continues to the next phase.
+approvals:
+  ActAgent:
+    - Support_L2
+    - Network_Admin
