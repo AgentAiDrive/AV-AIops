@@ -16,7 +16,7 @@ def model_light():
 model_light()
 
 st.success("Database seeded & initialized.")
-st.title("❓ Help & Runbook")
+st.title("Support")
 try:
     from core.ui.page_tips import PAGE_TIPS  # type: ignore
 except Exception:    
