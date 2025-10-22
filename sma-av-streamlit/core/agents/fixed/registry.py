@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+# ...your existing imports...
+from .kb_publisher import KBPublisher
+
 FIXED_AGENTS = [
     "BaselineAgent",        # safety + policy preflight (risk windows, RBAC, secrets)
     "EventFormAgent",       # normalizes event form into canonical intake
@@ -6,6 +11,7 @@ FIXED_AGENTS = [
     "ActAgent",             # executes bounded MCP calls with audit & rollback
     "VerifyAgent",          # checks outcomes, collects evidence
     "LearnAgent",           # writes SNOW KB, updates dashboards
+    "KBPublisher",
 ]
 
 # Static capabilities per fixed agent (non-editable)
@@ -16,5 +22,6 @@ CAPS = {
     "PlanAgent": dict(allows=["choose_recipe","insert_approvals","expand_params"]),
     "ActAgent": dict(allows=["mcp_call","rollback","redact"]),
     "VerifyAgent": dict(allows=["assert","collect_evidence","kpi_record"]),
-    "LearnAgent": dict(allows=["kb_publish","cmdb_link","dash_update"]),
+    "LearnAgent": dict(allows=["kb_publish","cmdb_link","dash_udate"]),
+    "KBPublisher": KBpublisher(),
 }
