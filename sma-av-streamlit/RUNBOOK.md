@@ -1,7 +1,7 @@
-# SMA AV‑AI Ops Orchestration — Runbook
+# **Agentic Ops - IPAV Workflow Orchestration — Runbook**
 
 **Goal**  
-Operate AV workflows (Agents + Recipes + MCP Tools + Workflows) and observe results on a Dashboard, all inside the **IPAV** lifecycle: **Intake → Plan → Act → Verify**.
+Operate AV workflows Convert SOP's to Agentic workflows.  Create (Agents + Recipes + MCP Tools + Workflows) and observe results on a Dashboard, all inside the **IPAV** lifecycle: **Intake → Plan → Act → Verify**.
 
 **Data & Persistence**  
 - Primary DB (agents, recipes, workflows): your existing SQLAlchemy models.
@@ -22,6 +22,7 @@ app
 🧩 Workflows
 OO Dashboard
 ?? Help
+🔎 Run Details
 ```
 
 > Tip: Streamlit orders pages by file name, but this runbook references the **labels** you see in the sidebar.
@@ -31,7 +32,7 @@ OO Dashboard
 ## Architecture (logical)
 
 ```
-[Pages] Setup Wizard / Settings / Chat / Agents / Recipes / MCP Tools / Workflows / Dashboard
+[Pages] Setup Wizard / Settings / Chat / Agents / Recipes / MCP Tools / Workflows / Dashboard / Help / Run Details
    │
    ├──> [Controllers] core/workflow/engine.py + core/workflow/service.py
    │         └── executes recipes against agents; emits IPAV steps & artifacts
