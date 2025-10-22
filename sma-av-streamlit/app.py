@@ -19,54 +19,43 @@ st.success("Database seeded & initialized.")
 st.title("❓ Help & Runbook")
 try:
     from core.ui.page_tips import PAGE_TIPS  # type: ignore
-except Exception:
+except Exception:    
     PAGE_TIPS = {
-        "Setup Wizard": "Initialize DB, seed demo agents/tools/recipes, and sample workflows. Safe to run multiple times.",
-        "Settings": "Choose active LLM (OpenAI↔Anthropic) for Chat/recipes/SOPs. Indicator shows which model is active.",
-        "Chat": "Slash commands to generate SOPs → Recipes → Run. Toggle JSON mode for raw payloads.",
-        "Agents": "Create agents, choose a recipe, trigger a run. Results appear in Dashboard → Runs.",
-        "Recipes": "Author YAML recipes in IPAV format; validate, version, and save to the library.",
-        "MCP Tools": "Discover local connectors (slack/zoom/servicenow). Check `/health` and call `/action` with JSON body.",
-        "Workflows": "Wire Agent + Recipe + Trigger (manual/interval). Every run records IPAV steps & artifacts.",
-        "Dashboard": "KPIs (runs, success %, p95 duration), trends, and run details (steps + artifacts).",
+        "Setup Wizard": (
+            "Initialize DB and seed demo content: fixed system agents (Baseline, EventForm, Intake, Plan, Act, Verify, Learn),"
+            "sample Orchestrator + Fixed-Agent recipes, and mock MCP tools. Idempotent—safe to run multiple times."
+        ),
+        "Settings": (
+            "Select active LLM provider (OpenAI ↔ Anthropic). Shows key source and MCP mock status."
+            "No silent fallback—set a valid API key in secrets/env."
+        ),
+        "Chat": (
+            "Use slash commands. **/sop** now compiles an Orchestrator recipe **plus** bound Fixed-Agent recipes from the SOP, "
+            "scaffolds required MCP tools, attaches to the chosen agent, and can execute the run. "
+            "Toggle JSON mode to view raw tool payloads."
+        ),
+        "Agents": (
+            "Manage agents. Fixed system agents are non-editable and enforce guardrails; user-created agents hold domain recipes. "
+            "Attach recipes and trigger runs with approvals where required."
+        ),
+        "Recipes": (
+            "Author and manage recipes. Library includes **Orchestrator** recipes (workflow ‘what’) and **Fixed-Agent** recipes "
+            "(phase ‘how’ for Intake/Plan/Act/Verify/Learn). Validate, version, and save."
+        ),
+        "MCP Tools": (
+            "Discover local connectors (Slack/Zoom/ServiceNow/Q-SYS/etc.). Run `/health` and `/action` with JSON. "
+            "Shows allow-listed methods; /sop can auto-scaffold tools referenced by the SOP."
+        ),
+        "Workflows": (
+            "Wire **Orchestrator + Agent + Trigger** (manual or interval). Approvals gate risky steps. "
+            "Each run records the full IPAV→L sequence with artifacts and evidence."
+        ),
+        "Dashboard": (
+            "KPIs and trends: runs, success %, p95 duration, First-Time-Right, MTTR, automation %. "
+            "Drill into Run Details for steps, approvals, evidence, and links to generated KB articles."
+        ),
     }
-```python
-PAGE_TIPS = {
-    "Setup Wizard": (
-        "Initialize DB and seed demo content: fixed system agents (Baseline, EventForm, Intake, Plan, Act, Verify, Learn),"
-        "sample Orchestrator + Fixed-Agent recipes, and mock MCP tools. Idempotent—safe to run multiple times."
-    ),
-    "Settings": (
-        "Select active LLM provider (OpenAI ↔ Anthropic). Shows key source and MCP mock status."
-        "No silent fallback—set a valid API key in secrets/env."
-    ),
-    "Chat": (
-        "Use slash commands. **/sop** now compiles an Orchestrator recipe **plus** bound Fixed-Agent recipes from the SOP, "
-        "scaffolds required MCP tools, attaches to the chosen agent, and can execute the run. "
-        "Toggle JSON mode to view raw tool payloads."
-    ),
-    "Agents": (
-        "Manage agents. Fixed system agents are non-editable and enforce guardrails; user-created agents hold domain recipes. "
-        "Attach recipes and trigger runs with approvals where required."
-    ),
-    "Recipes": (
-        "Author and manage recipes. Library includes **Orchestrator** recipes (workflow ‘what’) and **Fixed-Agent** recipes "
-        "(phase ‘how’ for Intake/Plan/Act/Verify/Learn). Validate, version, and save."
-    ),
-    "MCP Tools": (
-        "Discover local connectors (Slack/Zoom/ServiceNow/Q-SYS/etc.). Run `/health` and `/action` with JSON. "
-        "Shows allow-listed methods; /sop can auto-scaffold tools referenced by the SOP."
-    ),
-    "Workflows": (
-        "Wire **Orchestrator + Agent + Trigger** (manual or interval). Approvals gate risky steps. "
-        "Each run records the full IPAV→L sequence with artifacts and evidence."
-    ),
-    "Dashboard": (
-        "KPIs and trends: runs, success %, p95 duration, First-Time-Right, MTTR, automation %. "
-        "Drill into Run Details for steps, approvals, evidence, and links to generated KB articles."
-    ),
-}
-```
+
 
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
