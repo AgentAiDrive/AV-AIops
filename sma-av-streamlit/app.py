@@ -23,12 +23,13 @@ def _fetch_pil_image(url: str) -> Image.Image | None:
 _icon_img = _fetch_pil_image(ICON_URL)
 
 # ---------- Page config (must be first Streamlit command) ----------
+
 st.set_page_config(page_title="Agentic Ops IPAV", page_icon=_icon_img or "🎛️", layout="wide")
 
 # ---------- Header ----------
+st.image(ICON_URL, caption="", width=193)
 st.title("Agentic Ops - IPAV Workflow Orchestration")
 # Show the same image under the title (keeps README width ≈93)
-st.image(ICON_URL, caption="ipav_agentic av", width=93)
 
 st.write("Use sidebar to navigate.")
 
