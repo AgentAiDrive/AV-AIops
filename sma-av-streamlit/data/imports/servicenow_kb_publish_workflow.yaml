@@ -1,0 +1,31 @@
+name: Publish AV KB to ServiceNow
+description: Run IPAV agents to validate system and publish new article to ServiceNow KB.
+trigger: manual
+agent: OrchestratorAgent
+recipe: generic_av_operational_workflow
+ipav_agents:
+  - BaselineAgent
+  - IntakeAgent
+  - PlanAgent
+  - ActAgent
+  - VerifyAgent
+  - LearnAgent
+mcp_tools:
+  - qsys_control
+  - dante_routes
+  - slack
+  - servicenow
+  - zoom
+  - network_monitor
+intake_parameters:
+  room_email: zoom-room-123@example.com
+  issue_summary: Zoom HDMI black screen
+  steps_taken: |
+    - Rebooted Q-SYS DSP
+    - Reset Dante patch
+    - Verified via camera + Slack
+success_criteria:
+  - Zoom Room online
+  - Q-SYS audio passing
+  - HDMI input restored
+  - KB posted with sys_id
