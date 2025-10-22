@@ -193,12 +193,18 @@ def import_zip(
                             candidate = f"{name} ({i})"
                         name = candidate
                         key = name.lower()
+                  # OVERWRITE existing recipe
                     elif merge == "overwrite":
                         if not dry_run:
-                            a = existing[key]
-                            a.domain = row.get("domain") or a.domain
-                            a.config_json = row.get("config_json") or a.config_json
-                        result["updated"]["agents"] += 1
+                            r = existing[key]
+                            fn = _slug(name) + ".yaml"
+                            (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
+                            if hasattr(r, "yaml_path"):
+                                r.yaml_path = fn
+                            # NEW: also keep inline copy
+                            if hasattr(r, "yaml"):
+                                setattr(r, "yaml", ytxt)
+                        result["updated"]["recipes"] += 1
                         continue
                 if not dry_run:
                     db.add(Agent(name=name, domain=row.get("domain") or "", config_json=row.get("config_json") or {}))
@@ -268,11 +274,13 @@ def import_zip(
                                 setattr(r, "yaml", ytxt)
                         result["updated"]["recipes"] += 1
                         continue
-                if not dry_run:
-                    fn = _slug(name) + ".yaml"
-                    (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
-                    db.add(Recipe(name=name, yaml_path=fn))
-                result["created"]["recipes"] += 1
+                                     # CREATE new recipe
+                        if not dry_run:
+                            fn = _slug(name) + ".yaml"
+                            (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
+                            # NEW: store inline yaml too (works even if file is unreadable later)
+                            db.add(Recipe(name=name, yaml_path=fn, yaml=ytxt))
+                        result["created"]["recipes"] += 1
             _maybe_commit(db)
 
         # ---------- Workflows ----------
@@ -352,7 +360,6 @@ def import_zip(
                             )
                         result["updated"]["workflows"] += 1
                         continue
-
                 # create new
                 if not dry_run:
                     new_wf = create_workflow(
