@@ -99,3 +99,122 @@ def save_recipe_yaml(recipe: Recipe, yaml_text: str, write_file: bool = True) ->
 
     out = _USER_RECIPES_DIR / Path(fname).name
     out.write_text(yaml_text, encoding="utf-8")
+    
+    try:
+        import yaml  # PyYAML (already in requirements)
+    except Exception as _e:
+        yaml = None  # We will raise a clear error if we actually need to parse YAML
+    
+    from core.db.session import get_session
+    from core.db.models import Recipe
+    
+    # Default app recipes dir (repo checkout)
+    _APP_RECIPES_DIR = Path(__file__).resolve().parents[2] / "recipes"
+    # User-writable fallback (where imports are written when repo is read-only)
+    _USER_RECIPES_DIR = Path.home() / ".sma_avops" / "recipes"
+    
+    
+    def _read_file_if_exists(path: Path) -> Optional[str]:
+        try:
+            if path.exists() and path.is_file():
+                return path.read_text(encoding="utf-8")
+        except Exception:
+            pass
+        return None
+    
+    
+    def _candidate_paths(yaml_path: str | None) -> list[Path]:
+        """Given a stored yaml_path (usually a filename), build likely locations."""
+        paths: list[Path] = []
+        if not yaml_path:
+            return paths
+    
+        p = Path(yaml_path)
+    
+        # absolute path stored? try it first
+        if p.is_absolute():
+            paths.append(p)
+    
+        # repo recipes/
+        paths.append(_APP_RECIPES_DIR / p)
+    
+        # user-writable imports directory (import UI writes here)
+        paths.append(_USER_RECIPES_DIR / p.name)
+    
+        # optional extra search roots via env var
+        extra_roots = os.getenv("AVOPS_RECIPES_DIRS", "")
+        for root in [r.strip() for r in extra_roots.split(",") if r.strip()]:
+            paths.append(Path(root) / p.name)
+    
+        # de-dup while preserving order
+        seen = set()
+        uniq: list[Path] = []
+        for x in paths:
+            if str(x) not in seen:
+                uniq.append(x)
+                seen.add(str(x))
+        return uniq
+    
+    
+    def load_recipe_yaml_text(recipe: Recipe) -> str:
+        """
+        Return YAML text for a Recipe.
+        Order of precedence:
+          1) inline DB field 'yaml' (if present)
+          2) file at any of the candidate locations
+        Raises FileNotFoundError if not found.
+        """
+        # Prefer inline YAML if stored in DB
+        y_inline = getattr(recipe, "yaml", None)
+        if y_inline and str(y_inline).strip():
+            return str(y_inline)
+    
+        # Otherwise try file system locations
+        for p in _candidate_paths(getattr(recipe, "yaml_path", None)):
+            txt = _read_file_if_exists(p)
+            if txt is not None:
+                return txt
+    
+        tried = [str(p) for p in _candidate_paths(getattr(recipe, "yaml_path", None))]
+        raise FileNotFoundError(
+            f"Recipe YAML not found for '{getattr(recipe, 'name', '?')}'. Tried: {tried}"
+        )
+    
+    
+    def _resolve_recipe(db, recipe_or_id: Recipe | int) -> Recipe:
+        """Get a Recipe instance from an id or pass-through an instance."""
+        if isinstance(recipe_or_id, Recipe):
+            return recipe_or_id
+        # SQLAlchemy 1.4/2.x compatibility
+        rec = getattr(db, "get", None)
+        if callable(rec):
+            obj = db.get(Recipe, int(recipe_or_id))
+        else:
+            obj = db.query(Recipe).filter(Recipe.id == int(recipe_or_id)).first()
+        if not obj:
+            raise LookupError(f"Recipe id {recipe_or_id} not found")
+        return obj
+    
+    
+    def load_recipe_dict(recipe_or_id: Recipe | int, db=None) -> Dict[str, Any]:
+        """
+        Engine-facing API expected by core/workflow/engine.py.
+    
+        Returns a parsed YAML dict for the given recipe id or Recipe object.
+        Looks in DB inline YAML first, then in repo recipes/, then in ~/.sma_avops/recipes/.
+        """
+        if yaml is None:
+            raise RuntimeError("PyYAML is required to parse recipe YAML (package 'pyyaml' missing).")
+    
+        if db is None:
+            with get_session() as _db:
+                rec = _resolve_recipe(_db, recipe_or_id)
+                text = load_recipe_yaml_text(rec)
+        else:
+            rec = _resolve_recipe(db, recipe_or_id)
+            text = load_recipe_yaml_text(rec)
+    
+        data = yaml.safe_load(text) or {}
+        if not isinstance(data, dict):
+            raise ValueError(f"Recipe '{getattr(rec, 'name', '?')}' YAML must parse to a mapping/dict, got {type(data).__name__}")
+        return data
