@@ -1,0 +1,17 @@
+{
+  "id": "agent-zoom-room-doctor-v1",
+  "name": "Zoom Room Doctor",
+  "role": "Proactive checks and synthetic tests for Zoom Rooms",
+  "recipes": [
+    "zoom-room-healthcheck-v1"
+  ],
+  "tools": [
+    "mcp-zoom",
+    "mcp-servicenow",
+    "mcp-slack"
+  ],
+  "guardrails": [
+    "default-guardrails-v1"
+  ],
+  "fallback_ok": true
+}

@@ -1,0 +1,18 @@
+{
+  "id": "agent-kb-recipe-scout-v1",
+  "name": "KB & Recipe Scout",
+  "role": "Search \u2192 sanitize \u2192 synthesize KB \u2192 SNOW \u2192 Slack \u2192 save recipe",
+  "recipes": [
+    "kb-recipe-scout-v1"
+  ],
+  "tools": [
+    "mcp-search",
+    "mcp-servicenow",
+    "mcp-slack",
+    "mcp-gdrive"
+  ],
+  "guardrails": [
+    "default-guardrails-v1"
+  ],
+  "fallback_ok": true
+}

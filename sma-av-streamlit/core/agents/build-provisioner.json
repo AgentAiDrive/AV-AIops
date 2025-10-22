@@ -1,0 +1,17 @@
+{
+  "id": "agent-build-provisioner-v1",
+  "name": "Build Provisioner",
+  "role": "Provision new rooms using standard templates",
+  "recipes": [
+    "room-build-provision-v1"
+  ],
+  "tools": [
+    "mcp-zoom",
+    "mcp-github",
+    "mcp-slack"
+  ],
+  "guardrails": [
+    "default-guardrails-v1"
+  ],
+  "fallback_ok": true
+}
