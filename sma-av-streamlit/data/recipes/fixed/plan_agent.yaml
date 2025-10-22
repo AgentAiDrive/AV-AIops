@@ -1,0 +1,46 @@
+agent_name: PlanAgent
+version: "1.0"
+scope:
+  description: >-
+    Creates an actionable plan based on the intake data, selecting an
+    appropriate procedure and injecting necessary approvals and variables.
+policy_tags:
+  - ipav
+  - plan
+mcp:
+  - tool: planner_api
+    allow:
+      - name: choose_recipe
+        risk: low
+      - name: insert_approvals
+        risk: low
+      - name: expand_parameters
+        risk: low
+steps:
+  # Choose the most suitable procedure for the situation from a list of
+  # pre‑defined candidate recipes.  The chosen recipe may depend on the
+  # intake data (e.g., whether a device is offline or network metrics are bad).
+  - id: choose_procedure
+    call: choose_recipe
+    args:
+      candidates: [Device_Reset, Network_QoS_Adjustment, Reboot_Room]
+    evidence: ["json:recipe_choice"]
+  # Insert role‑based approvals into the plan.  These approvals must be
+  # satisfied before risky actions in the act phase can run.
+  - id: insert_required_approvals
+    call: insert_approvals
+    args:
+      roles_required: [Support_L2, Network_Admin]
+    evidence: ["json:approvals_inserted"]
+  # Expand dynamic parameters based on the context such as room type and
+  # device model.  These parameters will be available in later phases via
+  # $context variables.
+  - id: expand_parameters
+    call: expand_parameters
+    args:
+      room_profile: "$context.room_type"
+      device_profile: "$context.device_type"
+    evidence: ["json:parameters_expanded"]
+outcomes:
+  success: Plan successfully created with selected procedure and approvals.
+  failure: Plan creation failed; check candidate list and context.

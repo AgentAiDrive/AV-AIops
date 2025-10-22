@@ -1,0 +1,87 @@
+agent_name: VerifyAgent
+version: "1.0"
+scope:
+  description: >-
+    Performs comprehensive verification after the act phase.  Checks that
+    devices, audio networking, network links and conferencing systems are
+    operational and within agreed thresholds.  Posts a summary update upon
+    completion.
+policy_tags:
+  - ipav
+  - verify
+mcp:
+  - tool: qsys_api
+    allow:
+      - name: verify_device_state
+        risk: low
+      - name: get_metering
+        risk: low
+  - tool: dante_ctrl
+    allow:
+      - name: verify_route
+        risk: low
+      - name: get_subscribers
+        risk: low
+  - tool: network_api
+    allow:
+      - name: verify_metrics
+        risk: low
+      - name: get_port_metrics
+        risk: low
+  - tool: zoom_admin
+    allow:
+      - name: get_room_health
+        risk: low
+  - tool: slack
+    allow:
+      - name: post_message
+        risk: low
+steps:
+  # Confirm the DSP or device is back in the expected operational state
+  # (e.g., after a factory reset or snapshot load).  The expected
+  # definition of "Operational" should be tuned per device type.
+  - id: verify_qsys_operation
+    call: qsys_api.verify_device_state
+    args:
+      device_id: "$context.device_id"
+      expected_state: Operational
+    evidence: ["json:qsys_verify"]
+  # Verify that the primary Dante route is active and locked.  Failure here
+  # indicates that audio routing did not recover properly.
+  - id: verify_dante_route
+    call: dante_ctrl.verify_route
+    args:
+      tx: "$context.primary_tx"
+      rx: "$context.primary_rx"
+    evidence: ["json:dante_verify"]
+  # Check the port performance metrics on the switch to ensure network quality
+  # meets thresholds set by network engineering.  Adjust thresholds as needed.
+  - id: verify_network_metrics
+    call: network_api.verify_metrics
+    args:
+      switch: "$context.switch"
+      port: "$context.port"
+      thresholds:
+        jitter_ms: 5
+        packet_loss_percent: 0.1
+        latency_ms: 10
+    evidence: ["json:network_verify"]
+  # Retrieve the current health status of the conferencing platform to ensure
+  # that the room is online with no critical faults.
+  - id: verify_zoom_status
+    call: zoom_admin.get_room_health
+    args:
+      room: "$context.room_id"
+    evidence: ["json:zoom_verify"]
+  # Communicate verification results to the operations channel for visibility.
+  - id: notify_result_slack
+    call: slack.post_message
+    args:
+      channel: "#av-operations"
+      text: |
+        Verification complete for room $context.room_id.
+        All checks passed and systems are operational.
+    evidence: ["json:verify_slack"]
+outcomes:
+  success: Verification passed for all checks.
+  failure: Verification failed; details recorded in evidence.

@@ -1,0 +1,120 @@
+agent_name: ActAgent
+version: "1.0"
+scope:
+  description: >-
+    Executes the sequence of actions selected during the planning phase.
+    This agent interacts with DSPs, audio networking, conferencing platforms,
+    network devices and collaboration tools.  Each action specifies the
+    required approvals and captures evidence so that downstream phases can
+    verify the outcome.
+policy_tags:
+  - ipav
+  - act
+mcp:
+  - tool: qsys_api
+    allow:
+      - name: load_snapshot
+        risk: medium
+        approval: Support_L2
+      - name: reboot_device
+        risk: medium
+        approval: Support_L2
+      - name: send_command
+        risk: medium
+        approval: Support_L2
+  - tool: dante_ctrl
+    allow:
+      - name: ensure_route
+        risk: low
+        approval: Support_L1
+      - name: subscribe
+        risk: low
+  - tool: zoom_admin
+    allow:
+      - name: reboot_room
+        risk: medium
+        approval: Support_L2
+      - name: update_settings
+        risk: medium
+        approval: Support_L2
+  - tool: network_api
+    allow:
+      - name: set_qos
+        risk: high
+        approval: Network_Admin
+      - name: reset_port
+        risk: medium
+        approval: Support_L2
+  - tool: slack
+    allow:
+      - name: post_message
+        risk: low
+      - name: post_image
+        risk: low
+  - tool: servicenow
+    allow:
+      - name: create_incident
+        risk: low
+      - name: update_incident
+        risk: low
+steps:
+  # Reload the factory snapshot on a Q‑SYS core or other DSP to restore
+  # baseline settings.  This step requires a Senior AV engineer approval
+  # because it may interrupt live audio routing.
+  - id: qsys_load_factory_reset
+    call: qsys_api.load_snapshot
+    args:
+      device_id: "$context.device_id"
+      snapshot: FactoryReset
+    approvals: [Support_L2]
+    evidence: ["json:qsys_reset"]
+  # Ensure the primary Dante route is present.  If a route is missing
+  # following a reset, it will be restored.  Low risk action with a
+  # quick rollback.
+  - id: dante_route_primary
+    call: dante_ctrl.ensure_route
+    args:
+      tx: "$context.primary_tx"
+      rx: "$context.primary_rx"
+    approvals: [Support_L1]
+    evidence: ["json:dante_route_primary"]
+  # Reboot the conferencing codec or room system (e.g., Zoom Room).  This
+  # will disconnect any ongoing sessions and therefore requires approval.
+  - id: zoom_room_reboot
+    call: zoom_admin.reboot_room
+    args:
+      room: "$context.room_id"
+    approvals: [Support_L2]
+    evidence: ["json:zoom_reboot"]
+  # Adjust the QoS policy on the network port.  This high‑risk action
+  # requires Network_Admin approval.  The policy is taken from context.
+  - id: network_qos_adjust
+    call: network_api.set_qos
+    args:
+      switch: "$context.switch"
+      port: "$context.port"
+      qos_policy: "$context.qos_policy"
+    approvals: [Network_Admin]
+    evidence: ["json:network_qos_set"]
+  # Send a status update to the AV operations channel so that teams are
+  # aware of the actions taken during this run.
+  - id: send_slack_update
+    call: slack.post_message
+    args:
+      channel: "#av-operations"
+      text: "Workflow run $run_id executed actions for room $context.room_id."
+    evidence: ["json:slack_update"]
+  # Create a record in ServiceNow so that operations teams have a ticket to
+  # track the incident or task associated with this workflow execution.
+  - id: create_incident_record
+    call: servicenow.create_incident
+    args:
+      title: "AV workflow actions executed"
+      description: |
+        Workflow run $run_id executed actions for room $context.room_id.
+        Please review the attached evidence for details.
+      urgency: Medium
+    evidence: ["json:incident_created"]
+outcomes:
+  success: All actions executed successfully.
+  failure: One or more actions failed; review run logs and incident ticket.
