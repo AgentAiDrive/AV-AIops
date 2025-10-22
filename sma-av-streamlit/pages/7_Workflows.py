@@ -164,7 +164,17 @@ Trigger: `{wf.trigger_type}` {wf.trigger_value or ''}"""
 
                 cols[4].write(f"Last: {wf.last_run_at or '—'} · Next: {wf.next_run_at or '—'} · Status: {status}")
 
+# --- Import to Writable Directory - Create Directory----------------------------------------------------------
+
+st.divider()
+st.subheader("Import / Export")
+
+# Writable location for imported recipe files (repo mount may be read-only)
+USER_RECIPES_DIR = Path.home() / ".sma_avops" / "recipes"
+USER_RECIPES_DIR.mkdir(parents=True, exist_ok=True)
+
 # --- Import / Export ----------------------------------------------------------
+
 st.divider()
 st.subheader("Import / Export")
 
@@ -202,7 +212,7 @@ with colI:
     if up is not None and st.button("Import bundle"):
         try:
             b = up.read()
-            result = import_zip(b, recipes_dir="recipes", merge=merge, dry_run=dry)
+            result = import_zip(b, recipes_dir=str(USER_RECIPES_DIR), merge=merge, dry_run=dry)
             st.json(result)
             if dry:
                 st.info("Dry run preview — no changes were written.")
@@ -211,4 +221,5 @@ with colI:
                 st.rerun()  # <— add this
         except Exception as e:
             st.error(f"Import failed: {type(e).__name__}: {e}")
-           
+
+          
