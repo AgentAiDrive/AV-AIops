@@ -1,0 +1,38 @@
+{
+  "id": "wf-support-first-response-v1",
+  "name": "Support \u2014 First Response",
+  "trigger": {
+    "type": "event",
+    "source": "slack",
+    "pattern": "#av-support:incident"
+  },
+  "graph": [
+    {
+      "id": "intake",
+      "run": {
+        "agent": "agent-incident-triage-v1",
+        "recipe": "incident-triage-v1"
+      },
+      "next": "verify"
+    },
+    {
+      "id": "verify",
+      "run": {
+        "type": "verify_outputs",
+        "expect": [
+          "triage_summary.sev",
+          "triage_summary.incident"
+        ]
+      },
+      "next": "done"
+    },
+    {
+      "id": "done",
+      "terminal": true
+    }
+  ],
+  "slas": {
+    "ack_sec": 300,
+    "ticket_create_sec": 900
+  }
+}

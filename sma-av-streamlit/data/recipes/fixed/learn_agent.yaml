@@ -1,0 +1,63 @@
+agent_name: LearnAgent
+version: "1.0"
+scope:
+  description: >-
+    Captures the learnings from the workflow run by publishing knowledge
+    articles and recording run metrics.  The learn phase ensures
+    institutional memory is updated and stakeholders are notified.
+policy_tags:
+  - ipav
+  - learn
+mcp:
+  - tool: servicenow
+    allow:
+      - name: create_kb
+        risk: low
+      - name: append_kb
+        risk: low
+  - tool: metrics_api
+    allow:
+      - name: record_run
+        risk: low
+      - name: update_kpi
+        risk: low
+  - tool: slack
+    allow:
+      - name: post_message
+        risk: low
+steps:
+  # Publish a knowledge base entry summarizing the workflow run.  The
+  # generated HTML should include key takeaways and pointers to the
+  # evidence captured during the run.
+  - id: publish_kb_entry
+    call: servicenow.create_kb
+    args:
+      title: "AV workflow report for $context.room_id"
+      html: |
+        <h2>Summary</h2>
+        <p>The workflow run $run_id executed successfully. All actions were
+        performed and all verifications passed.</p>
+        <h3>Evidence</h3>
+        <p>Refer to the attached artifacts for detailed logs and telemetry.</p>
+      tags: [av, workflow, report]
+    evidence: ["json:kb_entry"]
+  # Record run metrics into a metrics system for later analysis.  This
+  # includes the workflow name, run identifier and success/failure state.
+  - id: record_run_metrics
+    call: metrics_api.record_run
+    args:
+      workflow: Generic_AV_Operational_Workflow
+      run_id: "$run_id"
+      status: "$run_status"
+    evidence: ["json:metrics_record"]
+  # Notify stakeholders via collaboration channel that the learn phase is
+  # complete and resources have been updated.
+  - id: notify_completion
+    call: slack.post_message
+    args:
+      channel: "#av-operations"
+      text: "Knowledge base and metrics updated for run $run_id."
+    evidence: ["json:learn_slack"]
+outcomes:
+  success: Learn phase completed with KB and metrics update.
+  failure: Learn phase incomplete; review logs and try again.

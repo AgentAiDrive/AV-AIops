@@ -1,0 +1,67 @@
+agent_name: BaselineAgent
+version: "1.0"
+scope:
+  description: >-
+    Performs baseline safety and readiness checks before any AV workflow is
+    executed.  Ensures maintenance windows are respected, required roles are
+    present, secrets are loaded, and environment health meets policy.  If any
+    check fails, the workflow will be aborted.
+policy_tags:
+  - ipav
+  - baseline
+mcp:
+  - tool: policy
+    allow:
+      - name: policy_check
+        risk: low
+      - name: time_window_check
+        risk: low
+      - name: role_check
+        risk: low
+  - tool: secrets_api
+    allow:
+      - name: check_secrets
+        risk: low
+  - tool: health_api
+    allow:
+      - name: check_environment
+        risk: low
+steps:
+  # Ensure the workflow is running within the allowed maintenance window.
+  - id: check_policy_window
+    call: policy_check
+    args:
+      windows: ["06:00-22:00"]
+      days: [Mon, Tue, Wed, Thu, Fri]
+    evidence: ["json:policy_window"]
+  # Validate that the current time is within the configured window in minutes.
+  - id: check_time_window
+    call: time_window_check
+    args:
+      allowed_minutes: [360, 1320]
+    evidence: ["json:time_window"]
+  # Verify that required operational roles are currently staffed.
+  - id: check_role_presence
+    call: role_check
+    args:
+      required_roles: [Support_L1, Support_L2, Network_Admin]
+    evidence: ["json:role_check"]
+  # Confirm all required secrets (API tokens) are loaded in the secret vault.
+  - id: check_secrets_loaded
+    call: secrets_api.check_secrets
+    args:
+      secrets: [qsys_token, dante_token, zoom_token, servicenow_token]
+    evidence: ["json:secrets_check"]
+  # Inspect environment health (CPU, memory, disk) to ensure there is no systemic issue.
+  - id: check_environment_health
+    call: health_api.check_environment
+    args:
+      services: [database, message_queue, network_switches]
+      thresholds:
+        cpu_percent: 80
+        memory_percent: 80
+        disk_percent: 85
+    evidence: ["json:environment_health"]
+outcomes:
+  success: All baseline checks passed; proceed with workflow.
+  failure: Baseline check failed; workflow aborted.

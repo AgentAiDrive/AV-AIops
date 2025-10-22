@@ -1,0 +1,70 @@
+agent_name: IntakeAgent
+version: "1.0"
+scope:
+  description: >-
+    Gathers status and telemetry from conferencing systems, DSPs, network
+    devices and audio networking gear.  The intake phase collects the
+    necessary context to make informed planning and execution decisions.
+policy_tags:
+  - ipav
+  - intake
+mcp:
+  - tool: zoom_admin
+    allow:
+      - name: get_room_health
+        risk: low
+      - name: get_room_details
+        risk: low
+  - tool: qsys_api
+    allow:
+      - name: get_device_status
+        risk: low
+      - name: get_snapshot
+        risk: low
+  - tool: dante_ctrl
+    allow:
+      - name: get_routes
+        risk: low
+      - name: get_endpoints
+        risk: low
+  - tool: network_api
+    allow:
+      - name: get_port_metrics
+        risk: low
+      - name: get_switch_status
+        risk: low
+steps:
+  # Gather conferencing platform health for the target room.
+  - id: collect_zoom_health
+    call: zoom_admin.get_room_health
+    args:
+      room: "$context.room_id"
+    evidence: ["json:zoom_health"]
+  # Collect status from the Q‑SYS core or other DSP.
+  - id: collect_qsys_status
+    call: qsys_api.get_device_status
+    args:
+      device_id: "$context.device_id"
+    evidence: ["json:qsys_status"]
+  # Gather Dante or AoIP routing information.
+  - id: collect_dante_status
+    call: dante_ctrl.get_routes
+    args:
+      device: "$context.device_id"
+    evidence: ["json:dante_status"]
+  # Retrieve network metrics (jitter, packet loss, latency) from the switch port.
+  - id: collect_network_metrics
+    call: network_api.get_port_metrics
+    args:
+      switch: "$context.switch"
+      port: "$context.port"
+    evidence: ["json:network_metrics"]
+  # Optionally retrieve switch status (e.g., PoE budget, link status).
+  - id: collect_switch_status
+    call: network_api.get_switch_status
+    args:
+      switch: "$context.switch"
+    evidence: ["json:switch_status"]
+outcomes:
+  success: Intake completed successfully with all telemetry gathered.
+  failure: Intake failed; verify connectivity and permissions.

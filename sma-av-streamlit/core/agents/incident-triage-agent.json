@@ -1,0 +1,17 @@
+{
+  "id": "agent-incident-triage-v1",
+  "name": "Incident Triage Agent",
+  "role": "First-response triage with SNOW + Slack",
+  "recipes": [
+    "incident-triage-v1"
+  ],
+  "tools": [
+    "mcp-servicenow",
+    "mcp-slack",
+    "local-llm"
+  ],
+  "guardrails": [
+    "default-guardrails-v1"
+  ],
+  "fallback_ok": true
+}

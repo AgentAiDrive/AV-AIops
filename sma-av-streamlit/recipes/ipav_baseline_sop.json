@@ -1,0 +1,166 @@
+{
+  "sop_title": "IPAV Baseline Capture + MCP Scaffold",
+  "goal": "Establish 30-day baseline and license underuse, then schedule deltas for Value Realized.",
+  "context": {
+    "meeting_volume": {
+      "mode": "per_room_per_day",
+      "avg_meetings_per_room_per_day": 5.0,
+      "rooms_count": 500
+    },
+    "avg_attendees_per_meeting": 3,
+    "loaded_cost_per_hour_usd": 85,
+    "support_incidents": {
+      "mode": "per_room",
+      "incidents_per_room_per_month": 0.3,
+      "rooms_count": 500
+    },
+    "hours_of_operation": "7-7 weekdays",
+    "license_optimization": {
+      "selected": [
+        {
+          "key": "zoom_meetings",
+          "label": "Zoom Meetings",
+          "licenses": 1000,
+          "monthly_cost_per_license_usd": 19.99,
+          "underuse_percent": 3
+        }
+      ],
+      "est_monthly_savings": 599.6999999999999
+    },
+    "environment_defaults": {
+      "rooms": 500,
+      "employees": 10000,
+      "stacks": [
+        "Zoom",
+        "Q-SYS",
+        "Crestron",
+        "Logitech"
+      ]
+    },
+    "meta": {
+      "generated_at": "2025-10-22T04:14:35.221150",
+      "schema_version": "1.0.0"
+    }
+  },
+  "steps": [
+    {
+      "id": "prep_intake_payload",
+      "title": "Confirm intake payload",
+      "instruction": "Review captured parameters and confirm scope (rooms, employees, hours, incidents).",
+      "inputs": {
+        "meeting_volume": {
+          "mode": "per_room_per_day",
+          "avg_meetings_per_room_per_day": 5.0,
+          "rooms_count": 500
+        },
+        "avg_attendees_per_meeting": 3,
+        "loaded_cost_per_hour_usd": 85,
+        "support_incidents": {
+          "mode": "per_room",
+          "incidents_per_room_per_month": 0.3,
+          "rooms_count": 500
+        },
+        "hours_of_operation": "7-7 weekdays",
+        "license_optimization": {
+          "selected": [
+            {
+              "key": "zoom_meetings",
+              "label": "Zoom Meetings",
+              "licenses": 1000,
+              "monthly_cost_per_license_usd": 19.99,
+              "underuse_percent": 3
+            }
+          ],
+          "est_monthly_savings": 599.6999999999999
+        },
+        "environment_defaults": {
+          "rooms": 500,
+          "employees": 10000,
+          "stacks": [
+            "Zoom",
+            "Q-SYS",
+            "Crestron",
+            "Logitech"
+          ]
+        },
+        "meta": {
+          "generated_at": "2025-10-22T04:14:35.221150",
+          "schema_version": "1.0.0"
+        }
+      },
+      "expected_output": "Signed-off intake payload for baseline run."
+    },
+    {
+      "id": "mcp_scaffold",
+      "title": "Create/verify MCP connections",
+      "instruction": "Ensure MCP tool configs exist and are reachable.",
+      "tools": [
+        {
+          "id": "mcp.zoom",
+          "secrets": [
+            "ZOOM_ACCOUNT_ID",
+            "ZOOM_CLIENT_ID",
+            "ZOOM_CLIENT_SECRET"
+          ]
+        },
+        {
+          "id": "mcp.zoom_workspaces",
+          "secrets": [
+            "ZOOM_WORKSPACES_API_KEY"
+          ]
+        },
+        {
+          "id": "mcp.servicenow",
+          "secrets": [
+            "SN_INSTANCE",
+            "SN_USERNAME",
+            "SN_TOKEN"
+          ]
+        },
+        {
+          "id": "mcp.25live",
+          "secrets": [
+            "TWENTYFIVELIVE_BASE_URL",
+            "TWENTYFIVELIVE_API_KEY"
+          ]
+        }
+      ],
+      "expected_output": "All MCP tools registered and authenticated."
+    },
+    {
+      "id": "baseline_capture",
+      "title": "Capture baseline metrics",
+      "instruction": "Using MCP tools, pull 30-day baseline: meetings, participants, minutes, room utilization, incident rates, and license utilization.",
+      "expected_output": "Baseline snapshot persisted with evidence (timestamps, queries, counts)."
+    },
+    {
+      "id": "kb_seed",
+      "title": "Seed/Update KB in ServiceNow",
+      "instruction": "Synthesize an executive-readable baseline summary and post to ServiceNow KB; notify Slack.",
+      "expected_output": "SN KB article link + Slack message URL."
+    },
+    {
+      "id": "schedule_runs",
+      "title": "Schedule recurring baseline rollups",
+      "instruction": "Set weekly automation to refresh metrics and track Value Realized deltas.",
+      "expected_output": "Scheduled workflow entry visible on Dashboard."
+    }
+  ],
+  "acceptance_criteria": [
+    "MCP tools registered and authenticated.",
+    "Baseline snapshot saved with evidence hashes and timestamps.",
+    "KB article created/updated with links to evidence and charts.",
+    "Slack notification posted to #av-ops (or configured channel)."
+  ],
+  "how_to_implement": [
+    "Click \u201cDownload SOP JSON\u201d and paste into Chat with /sop.",
+    "Review generated Recipe YAML, save it in Recipes.",
+    "Attach the recipe to an agent in Agents.",
+    "Create a Workflow \u201cBaseline Capture\u201d using that recipe and run it.",
+    "View evidence and deltas in Dashboard; schedule weekly runs."
+  ],
+  "meta": {
+    "generated_at": "2025-10-22T04:14:35.221207",
+    "schema_version": "1.0.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "agent-event-conductor-v1",
+  "name": "Event Conductor",
+  "role": "Run-of-Show orchestration and comms",
+  "recipes": [
+    "event-ros-orchestration-v1"
+  ],
+  "tools": [
+    "mcp-zoom",
+    "mcp-slack",
+    "mcp-gdrive"
+  ],
+  "guardrails": [
+    "default-guardrails-v1"
+  ],
+  "fallback_ok": true
+}

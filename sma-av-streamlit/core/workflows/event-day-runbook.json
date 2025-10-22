@@ -1,0 +1,29 @@
+{
+  "id": "wf-event-day-runbook-v1",
+  "name": "Event Day Runbook",
+  "trigger": {
+    "type": "manual"
+  },
+  "params": {
+    "eventId": "EVT-2025-001",
+    "channel": "#av-events"
+  },
+  "graph": [
+    {
+      "id": "prep",
+      "run": {
+        "agent": "agent-event-conductor-v1",
+        "recipe": "event-ros-orchestration-v1",
+        "with": {
+          "eventId": "${params.eventId}",
+          "channel": "${params.channel}"
+        }
+      },
+      "next": "done"
+    },
+    {
+      "id": "done",
+      "terminal": true
+    }
+  ]
+}
