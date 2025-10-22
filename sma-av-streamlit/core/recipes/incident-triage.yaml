@@ -1,0 +1,110 @@
+id: incident-triage-v1
+title: Incident Triage & First Response
+version: 1.0.0
+owner: av-ops
+tags: [support, incidents, triage, slack, servicenow]
+description: >
+  Gather context, classify severity, acknowledge user, create/attach a ServiceNow incident,
+  suggest immediate steps, and post updates to Slack. Emits triage summary + SLO timers.
+
+inputs:
+  reporter: {type: string, required: true, description: "Requester name or email"}
+  channel:  {type: string, required: false, description: "Slack channel for updates", default: "#av-support"}
+  summary:  {type: string, required: true, description: "Short description of the issue"}
+  details:  {type: string, required: false, description: "Longer freeform details"}
+  roomId:   {type: string, required: false, description: "Room or space ID (if known)"}
+  impact:   {type: string, required: false, enum: [single-user, small-group, site, org]}
+  urgency:  {type: string, required: false, enum: [low, medium, high, critical]}
+
+preconditions:
+  - name: tools-available
+    check: any_of_tools
+    params: {tools: [mcp-servicenow, mcp-slack]}
+
+steps:
+  - id: classify
+    action: classify_incident
+    using: local-llm
+    params:
+      context: |
+        Reporter: {{inputs.reporter}}
+        Summary: {{inputs.summary}}
+        Details: {{inputs.details|default("n/a")}}
+        Impact: {{inputs.impact|default("unknown")}}, Urgency: {{inputs.urgency|default("unknown")}}
+      rubric: |
+        Map to {sev: P1..P4, category: [room, platform, device, network, event], confidence: 0..1}
+    saves: {sev: $.sev, category: $.category, confidence: $.confidence}
+
+  - id: ack-slack
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.channel}}"
+      text: |
+        👋 Acknowledged incident from {{inputs.reporter}} — *{{inputs.summary}}*.
+        Initial classification: *{{s.sev}}* ({{s.category}}). Investigating…
+    fallback:
+      simulate: true
+      message: "Slack not configured; simulated ACK"
+
+  - id: create-incident
+    action: create_incident
+    using: mcp-servicenow
+    params:
+      short_description: "[{{s.sev}}] {{inputs.summary}}"
+      description: |
+        Category: {{s.category}} (confidence {{s.confidence}})
+        Reporter: {{inputs.reporter}}
+        Room: {{inputs.roomId|default("n/a")}}
+        Details: {{inputs.details|default("n/a")}}
+      impact: "{{inputs.impact|default('single-user')}}"
+      urgency: "{{inputs.urgency|default('medium')}}"
+    saves: {snow_incident: $.number, snow_sys_id: $.sys_id}
+    fallback:
+      simulate: true
+      saves:
+        snow_incident: "INC0009999"
+        snow_sys_id: "sim-sysid-123"
+
+  - id: suggest-fixes
+    action: propose_immediate_steps
+    using: local-llm
+    params:
+      constraints:
+        - "Do not ask user to reboot if in the middle of a live meeting unless no alternative."
+        - "Prefer reversible diagnostics first."
+      inputs:
+        category: "{{s.category}}"
+        roomId: "{{inputs.roomId|default('unknown')}}"
+    saves: {quick_steps: $.steps}
+
+  - id: post-update
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.channel}}"
+      text: |
+        📌 Incident {{s.snow_incident}} created.
+        Quick steps for the requester: {{s.quick_steps | to_json}}
+    fallback:
+      simulate: true
+
+verify:
+  - assert: "s.sev in ['P1','P2','P3','P4']"
+  - assert: "s.snow_incident is not null"
+
+outputs:
+  triage_summary:
+    sev: "{{s.sev}}"
+    category: "{{s.category}}"
+    incident: "{{s.snow_incident}}"
+    steps: "{{s.quick_steps}}"
+
+metrics:
+  - name: mttack  # mean time to acknowledge
+    type: timer.start
+    at_step: ack-slack
+  - name: mttcreate # time to ticket create
+    type: timer.start_stop
+    start_step: classify
+    stop_step: create-incident

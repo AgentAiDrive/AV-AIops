@@ -1,0 +1,50 @@
+id: room-build-provision-v1
+title: Room Build & Provision
+version: 1.0.0
+owner: av-builds
+tags: [builds, provisioning, zoom, inventory, checklist]
+description: >
+  Provision a new room: create assets in inventory (GitHub/GDrive), set Zoom Room,
+  push standard presets, validate signals, and handoff.
+
+inputs:
+  roomId: {type: string, required: true}
+  template: {type: string, required: false, default: "standard-small"}
+  handoff_channel: {type: string, required: false, default: "#av-builds"}
+
+steps:
+  - id: create-assets
+    action: create_repo_folder
+    using: mcp-github
+    params: {name: "room-{{inputs.roomId}}", template: "{{inputs.template}}"}
+    fallback: {simulate: true}
+
+  - id: zoom-setup
+    action: provision_zoom_room
+    using: mcp-zoom
+    params: {roomId: "{{inputs.roomId}}", template: "{{inputs.template}}"}
+    fallback: {simulate: true}
+
+  - id: presets
+    action: push_presets
+    using: local
+    params: {roomId: "{{inputs.roomId}}", template: "{{inputs.template}}"}
+
+  - id: validate
+    action: validate_signals
+    using: local
+    params: {roomId: "{{inputs.roomId}}", tests: ["audio", "video", "content"]}
+    saves: {validation: $.report}
+
+  - id: handoff
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.handoff_channel}}"
+      text: "✅ Room {{inputs.roomId}} provisioned with template {{inputs.template}}. Validation: {{s.validation | to_json}}"
+    fallback: {simulate: true}
+
+outputs:
+  provision:
+    roomId: "{{inputs.roomId}}"
+    validation: "{{s.validation}}"

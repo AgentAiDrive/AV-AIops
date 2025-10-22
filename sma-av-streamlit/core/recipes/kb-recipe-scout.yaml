@@ -1,0 +1,78 @@
+id: kb-recipe-scout-v1
+title: KB & Recipe Scout
+version: 1.0.0
+owner: av-ops
+tags: [kb, documentation, recipes, servicenow, slack, search]
+description: >
+  Search for authoritative sources, fetch/sanitize content, synthesize a ServiceNow KB HTML,
+  create/update KB via mcp-servicenow, notify Slack, and save a local recipe draft.
+
+inputs:
+  topic: {type: string, required: true}
+  tags:  {type: array, required: false, default: ["av", "how-to"]}
+  channel: {type: string, required: false, default: "#av-kb"}
+
+steps:
+  - id: search
+    action: search
+    using: mcp-search
+    params: {q: "{{inputs.topic}} AV how-to best practices", limit: 5}
+    saves: {hits: $.results}
+    fallback:
+      simulate: true
+      saves: {hits: ["Simulated source A", "Simulated source B"]}
+
+  - id: fetch-sanitize
+    action: fetch_and_sanitize
+    using: local
+    params: {sources: "{{s.hits}}"}
+    saves: {clean_blocks: $.blocks}
+
+  - id: synthesize-kb
+    action: synthesize_html
+    using: local-llm
+    params:
+      template: "snow-kb"
+      title: "How to: {{inputs.topic}}"
+      tags: "{{inputs.tags}}"
+      blocks: "{{s.clean_blocks}}"
+    saves: {kb_html: $.html}
+
+  - id: create-or-update
+    action: upsert_kb
+    using: mcp-servicenow
+    params:
+      title: "How to: {{inputs.topic}}"
+      html: "{{s.kb_html}}"
+      tags: "{{inputs.tags}}"
+    saves: {kb_number: $.number, kb_sys_id: $.sys_id}
+    fallback:
+      simulate: true
+      saves:
+        kb_number: "KB0001234"
+        kb_sys_id: "sim-kb-1"
+
+  - id: notify
+    action: post_message
+    using: mcp-slack
+    params:
+      channel: "{{inputs.channel}}"
+      text: "🧠 New/updated KB {{s.kb_number}} for topic '{{inputs.topic}}'."
+    fallback: {simulate: true}
+
+  - id: save-recipe-draft
+    action: save_recipe
+    using: local
+    params:
+      filename: "recipes/drafts/{{inputs.topic | slug}}.yaml"
+      content: |
+        # Draft recipe derived from KB {{s.kb_number}}
+        id: draft-{{inputs.topic | slug}}-v0
+        title: Draft {{inputs.topic}}
+        version: 0.0.1
+        steps: []
+
+outputs:
+  kb_result:
+    number: "{{s.kb_number}}"
+    sys_id: "{{s.kb_sys_id}}"
