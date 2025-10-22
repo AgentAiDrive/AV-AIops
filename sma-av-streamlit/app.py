@@ -1,11 +1,35 @@
 from __future__ import annotations
 import re
-import streamlit as st
 from pathlib import Path
+from io import BytesIO
+import requests
+from PIL import Image, UnidentifiedImageError
+import streamlit as st
 from core.db.seed import init_db
 
-st.set_page_config(page_title="Agentic Ops IPAV", page_icon="🎛️", layout="wide")
+# ---------- Icon: fetch from GitHub user-attachments BEFORE any st.* calls ----------
+ICON_URL = "https://github.com/user-attachments/assets/7b26b308-8419-476d-af95-0e7d1844dd9d"
+
+def _fetch_pil_image(url: str) -> Image.Image | None:
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        img = Image.open(BytesIO(r.content))
+        img.load()  # force load to avoid lazy issues
+        return img
+    except (requests.RequestException, UnidentifiedImageError, OSError):
+        return None
+
+_icon_img = _fetch_pil_image(ICON_URL)
+
+# ---------- Page config (must be first Streamlit command) ----------
+st.set_page_config(page_title="Agentic Ops IPAV", page_icon=_icon_img or "🎛️", layout="wide")
+
+# ---------- Header ----------
 st.title("Agentic Ops - IPAV Workflow Orchestration")
+# Show the same image under the title (keeps README width ≈93)
+st.image(ICON_URL, caption="ipav_agentic av", width=93)
+
 st.write("Use sidebar to navigate.")
 
 def model_light():
@@ -19,7 +43,7 @@ st.success("Database seeded & initialized.")
 st.title("Support")
 try:
     from core.ui.page_tips import PAGE_TIPS  # type: ignore
-except Exception:    
+except Exception:
     PAGE_TIPS = {
         "Setup Wizard": (
             "Initialize DB and seed demo content: fixed system agents (Baseline, EventForm, Intake, Plan, Act, Verify, Learn),"
@@ -55,7 +79,6 @@ except Exception:
             "Drill into Run Details for steps, approvals, evidence, and links to generated KB articles."
         ),
     }
-
 
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
