@@ -1,0 +1,35 @@
+{
+  "id": "wf-kb-continuous-curation-v1",
+  "name": "KB Continuous Curation",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 */6 * * *"
+  },
+  "params": {
+    "topics": [
+      "Zoom Room console pairing",
+      "Q-SYS camera presets",
+      "Dante clocking basics"
+    ]
+  },
+  "graph": [
+    {
+      "id": "scan",
+      "run": {
+        "type": "foreach",
+        "items": "params.topics",
+        "do": {
+          "agent": "agent-kb-recipe-scout-v1",
+          "recipe": "kb-recipe-scout-v1",
+          "with": {
+            "topic": "${item}"
+          }
+        }
+      }
+    },
+    {
+      "id": "done",
+      "terminal": true
+    }
+  ]
+}
