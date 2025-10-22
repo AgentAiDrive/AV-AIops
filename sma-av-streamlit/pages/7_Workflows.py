@@ -198,15 +198,17 @@ with colI:
     up = st.file_uploader("Upload .zip", type=["zip"])
     merge = st.radio("Merge strategy", ["skip", "overwrite", "rename"], index=0,
                      help="For duplicates by name: skip, overwrite in place, or keep both by renaming.")
-    dry = st.checkbox("Dry run (preview only)", value=True)
+    dry = st.checkbox("Dry run (preview only)", value=False)
     if up is not None and st.button("Import bundle"):
         try:
             b = up.read()
             result = import_zip(b, recipes_dir="recipes", merge=merge, dry_run=dry)
+            st.json(result)
             if dry:
                 st.info("Dry run preview — no changes were written.")
-            st.json(result)
-            if not dry:
-                st.success("Import finished. Refresh the page to see changes.")
+            else:
+                st.success("Import finished. Refreshing…")
+                st.rerun()  # <— add this
         except Exception as e:
             st.error(f"Import failed: {type(e).__name__}: {e}")
+           
