@@ -47,7 +47,7 @@ with st.sidebar:
         "Steps:\n"
         "- Gather_room\n"
         "- Reset projector\n"
-        "- Verify image via Slack"
+        "- Verify image via ServiceNow KB"
     )
     json_mode = st.checkbox("JSON mode (raw tool payloads)", value=False)
     # Present a set of example slash commands for users to copy/paste.  A raw
@@ -80,6 +80,11 @@ Steps:
         "Tip: Wrap multi-word names in quotes. Key/value pairs accept agent=, "
         "recipe=, etc."
     )
+   # NEW: Surface that /sop now also emits an orchestrator + fixed-agent bundle
+    st.markdown(
+        "<small>New:</small> <em>/sop</em> also compiles an **Orchestrator** recipe and **Fixed-Agent** recipes (Intake/Plan/Act/Verify/Learn) from the same SOP. See the collapsible output after a run.",
+       unsafe_allow_html=True,
+     )
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
 # Determine which LLM provider and key are active.  These values are pulled
@@ -164,6 +169,22 @@ def _handle_sop(cmd: SlashCommand) -> tuple[str, str, list, list, str, Optional[
         run = execute_recipe_run(db, agent_id=a.id, recipe_id=r.id)
         return a.name, r.name, tools, created, yml, getattr(run, "id", None)
 
+def _render_bundle_for_sop(cmd: SlashCommand, orchestrator_name: str) -> None:
+    """
+    NEW: Build and display the orchestrator + fixed-agent recipes derived from the same SOP.
+    This is additive and does not change the legacy /sop flow.
+    """
+    try:
+        sop_text = cmd.body or (cmd.raw.split("\n", 1)[1] if "\n" in cmd.raw else cmd.raw)
+        ctx = {"name": orchestrator_name or "Workflow_From_SOP"}
+        artifacts = compile_sop_to_bundle(sop_text, ctx)
+        with st.expander("Generated Orchestrator & Fixed-Agent Recipes (bundle)", expanded=False):
+            st.success("Created orchestrator and fixed-agent recipes from SOP.")
+            for k, p in artifacts.items():
+                st.write(f"**{k}** → `{p}`")
+        st.caption("Tip: Attach the orchestrator recipe to a workflow or run it from the Dashboard.")
+    except Exception as e:
+        st.warning(f"Bundle generation skipped: {type(e).__name__}: {e}")
 
 def _slugify(name: str) -> str:
     """Normalize a name into a slug suitable for filenames."""
@@ -307,6 +328,8 @@ def _dispatch_command(cmd: SlashCommand) -> Optional[str]:
             st.write("New tools scaffolded:", created)
         with st.expander("Generated YAML", expanded=False):
             st.code(yml, language="yaml")
+        # NEW: Also compile and show the orchestrator + fixed-agent bundle derived from the same SOP
+        _render_bundle_for_sop(cmd, orchestrator_name=recipe_name)
         return (
             f"Attached recipe '{recipe_name}' to '{agent_name}' and executed run {run_id or '—'}."
         )
@@ -402,3 +425,9 @@ if prompt:
                         st.code(t)
                     except Exception as e:
                         st.error(f"Provider call failed: {type(e).__name__}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# NOTE: Do not remove or override the existing UI flow.
+# The new bundle compiler is invoked in _dispatch_command('/sop') via _render_bundle_for_sop.
+# ---------------------------------------------------------------------------
