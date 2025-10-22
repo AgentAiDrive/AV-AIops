@@ -1,0 +1,35 @@
+{
+  "id": "wf-daily-room-health-v1",
+  "name": "Daily Room Health Survey",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 6 * * *"
+  },
+  "params": {
+    "roomIds": [
+      "ZR-101",
+      "ZR-102",
+      "ZR-201"
+    ]
+  },
+  "graph": [
+    {
+      "id": "for-each-room",
+      "run": {
+        "type": "foreach",
+        "items": "params.roomIds",
+        "do": {
+          "agent": "agent-zoom-room-doctor-v1",
+          "recipe": "zoom-room-healthcheck-v1",
+          "with": {
+            "roomId": "${item}"
+          }
+        }
+      }
+    },
+    {
+      "id": "done",
+      "terminal": true
+    }
+  ]
+}
