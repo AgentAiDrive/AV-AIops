@@ -24,6 +24,7 @@ DEFAULT_PLATFORMS = [
 def yaml_escape(s: str) -> str:
     return (s or "").replace('"', '\\"')
 
+
 def build_sop(payload: dict) -> dict:
     now = datetime.utcnow().isoformat()
     steps = [
@@ -86,6 +87,7 @@ def build_sop(payload: dict) -> dict:
         "meta": {"generated_at": now, "schema_version": "1.0.0"},
     }
 
+
 def build_yaml(payload: dict) -> str:
     hours = payload.get("hours_of_operation") or "hours"
     platforms = payload.get("license_optimization", {}).get("selected", [])
@@ -96,14 +98,15 @@ def build_yaml(payload: dict) -> str:
     for p in platforms:
         plat_yaml.append(
             f'      - key: {p.get("key")}\n'
-            f'        label: "{yaml_escape(p.get("label",""))}"\n'
+            f'        label: "{yaml_escape(p.get("label", ""))}"\n'
             f'        licenses: {p.get("licenses", 0)}\n'
-            f'        monthly_cost_per_license_usd: {p.get("monthly_cost_per_license_usd") or 0}\n'
-            f'        underuse_percent: {p.get("underuse_percent") or 0}'
+            # Preserve 0 values; do not convert to None when cost or underuse percent is zero.
+            f'        monthly_cost_per_license_usd: {p.get("monthly_cost_per_license_usd", 0)}\n'
+            f'        underuse_percent: {p.get("underuse_percent", 0)}'
         )
     plat_block = "\n".join(plat_yaml) if plat_yaml else "      - {}"
 
-    stacks = payload.get("environment_defaults", {}).get("stacks", ["Zoom","Q-SYS","Crestron","Logitech"])
+    stacks = payload.get("environment_defaults", {}).get("stacks", ["Zoom", "Q-SYS", "Crestron", "Logitech"])
     stacks_str = ", ".join(f'"{yaml_escape(s)}"' for s in stacks)
 
     return f'''# IPAV Recipe: Baseline Capture + MCP Scaffold
@@ -119,19 +122,19 @@ recipe:
   parameters:
     avg_attendees_per_meeting: {payload.get("avg_attendees_per_meeting") or 0}
     loaded_cost_per_hour_usd: {payload.get("loaded_cost_per_hour_usd") or 0}
-    hours_of_operation: "{yaml_escape(payload.get("hours_of_operation",""))}"
+    hours_of_operation: "{yaml_escape(payload.get("hours_of_operation", ""))}"
     environment:
-      rooms: {payload.get("environment_defaults",{}).get("rooms", 500)}
-      employees: {payload.get("environment_defaults",{}).get("employees", 10000)}
+      rooms: {payload.get("environment_defaults", {}).get("rooms", 500)}
+      employees: {payload.get("environment_defaults", {}).get("employees", 10000)}
       stacks: [{stacks_str}]
     meeting_volume:
-      mode: {mv.get("mode","per_room_per_day")}
+      mode: {mv.get("mode", "per_room_per_day")}
       avg_meetings_per_room_per_day: {mv.get("avg_meetings_per_room_per_day") or 0}
       rooms_count: {mv.get("rooms_count") or 0}
       meetings_enterprise_per_month: {mv.get("meetings_enterprise_per_month") or 0}
       employees_count: {mv.get("employees_count") or 0}
     support_incidents:
-      mode: {inc.get("mode","per_room")}
+      mode: {inc.get("mode", "per_room")}
       incidents_per_room_per_month: {inc.get("incidents_per_room_per_month") or 0}
       rooms_count: {inc.get("rooms_count") or 0}
       incidents_enterprise_per_month: {inc.get("incidents_enterprise_per_month") or 0}
@@ -232,6 +235,7 @@ recipe:
       from: publish_kb
 '''
 
+
 def validate(payload: dict):
     errors, warns = [], []
     mv = payload.get("meeting_volume", {}) or {}
@@ -278,6 +282,7 @@ def validate(payload: dict):
             warns.append(f'{p.get("label")}: underuse > 25%; consider reducing licenses.')
     return errors, warns
 
+
 # ---------- page header ----------
 PAGE_KEY = "Setup Wizard"
 show_tip(PAGE_KEY)
@@ -301,7 +306,7 @@ st.markdown(
 2. Fill **Average attendees per meeting** and **Loaded cost per hour**.  
 3. Select **Hours of Operation** (or provide a **Custom** string).  
 4. Under **License Optimization**, tick platforms you own and enter **license counts** (optional: cost & underuse % for savings preview).  
-5. Click **Generate** to preview, then use **Copy** or **Download** for SOP JSON and IPAV Recipe YAML.
+5. Click **Generate** to preview, then use **Copy** or **Download** for SOP JSON and IPAV Recipe YAML.  
 6. Go To **Chat** and type '/sop' then paste your baseline to generate a formatted recipe.
 7. This isn't connected to your platforms.  To use actual data from your platforms - create an agent, connect MCP's, Recipe and Workflow.
 """
@@ -405,13 +410,14 @@ for plat in platforms:
         under = q3.number_input(
             f"Underuse % — {plat['label']}", min_value=0, max_value=100, step=1, value=0, key=f"under_{plat['key']}"
         )
+        # Preserve cost and underuse values even when zero; do not convert to None
         selected_platforms.append(
             {
                 "key": plat["key"],
                 "label": plat["label"],
                 "licenses": int(qty),
-                "monthly_cost_per_license_usd": float(cost) if cost else None,
-                "underuse_percent": int(under) if under else None,
+                "monthly_cost_per_license_usd": float(cost),
+                "underuse_percent": int(under),
             }
         )
 
