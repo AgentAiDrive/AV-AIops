@@ -8,7 +8,9 @@ import streamlit as st
 from core.db.seed import init_db
 
 # ---------- Icon: fetch from GitHub user-attachments BEFORE any st.* calls ----------
-ICON_URL = "https://github.com/user-attachments/assets/00c68a1d-224f-4170-b44f-9982bf4b5e8d"
+LOGO_URL = "https://github.com/user-attachments/assets/00c68a1d-224f-4170-b44f-9982bf4b5e8d"
+
+ICON_URL = "https://raw.githubusercontent.com/AgentAiDrive/AV-AIops/refs/heads/IPAV-Agents/sma-av-streamlit/ipav.ico"
 
 def _fetch_pil_image(url: str) -> Image.Image | None:
     try:
@@ -20,11 +22,11 @@ def _fetch_pil_image(url: str) -> Image.Image | None:
     except (requests.RequestException, UnidentifiedImageError, OSError):
         return None
 
-_icon_img = _fetch_pil_image(ICON_URL)
+_icon_img = _fetch_pil_image(LOGO_URL)
 
 # ---------- Page config (must be first Streamlit command) ----------
 
-st.set_page_config(page_title="Agentic Ops IPAV", page_icon=_icon_img or "🎛️", layout="wide")
+st.set_page_config(page_title="Agentic Ops IPAV", page_icon= ipav.ico, layout="wide")
 
 # ---------- Header ----------
 st.image(ICON_URL, caption="", width=293)
