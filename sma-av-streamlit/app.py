@@ -8,7 +8,7 @@ import streamlit as st
 from core.db.seed import init_db
 
 # ---------- Icon: fetch from GitHub user-attachments BEFORE any st.* calls ----------
-ICON_URL = "https://github.com/user-attachments/assets/7b26b308-8419-476d-af95-0e7d1844dd9d"
+ICON_URL = "https://github.com/user-attachments/assets/00c68a1d-224f-4170-b44f-9982bf4b5e8d"
 
 def _fetch_pil_image(url: str) -> Image.Image | None:
     try:
@@ -27,7 +27,7 @@ _icon_img = _fetch_pil_image(ICON_URL)
 st.set_page_config(page_title="Agentic Ops IPAV", page_icon=_icon_img or "🎛️", layout="wide")
 
 # ---------- Header ----------
-st.image(ICON_URL, caption="", width=193)
+st.image(ICON_URL, caption="", width=293)
 st.title("Agentic Ops - IPAV Workflow Orchestration")
 # Show the same image under the title (keeps README width ≈93)
 
