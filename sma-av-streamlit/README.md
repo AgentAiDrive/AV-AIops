@@ -1,5 +1,6 @@
 
 <img width="93" height="70" alt="ipav_agentic av" src="https://github.com/user-attachments/assets/7b26b308-8419-476d-af95-0e7d1844dd9d" />
+<img width="120" height="89" alt="ipav_agentic av -blue" src="https://github.com/user-attachments/assets/00c68a1d-224f-4170-b44f-9982bf4b5e8d" />
 
 **The Agentic Ops IPAV application provides a suite of features for creating AI-driven operational workflows using NLP, MCP and converting SOP's into agentic recipes YAML and JSON.**
 
