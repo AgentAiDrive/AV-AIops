@@ -15,7 +15,7 @@ To run the application locally:
 
 **Clone the repository:**
 # Make sure IPAV-Agents branch selected
-git clone https://github.com/AgentAiDrive/AV-AIops/sma-av-streamlit.git
+git clone https://github.com/AgentAiDrive/AV-AIops/tree/IPAV-Agents/sma-av-streamlit.git
 cd AV-AIops
 
 Create a virtual environment and install dependencies:
