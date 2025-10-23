@@ -14,6 +14,7 @@ from core.recipes.attach import attach_recipe_to_agent
 from core.recipes.from_sop import sop_to_recipe_yaml
 from core.recipes.service import save_recipe_yaml
 from core.recipes.validator import validate_yaml_text
+from core.recipes.sop_compiler import compile_sop_to_bundle  # Import the bundle compiler for orchestrator & fixed-agent recipes
 from core.ui.page_tips import show as show_tip
 from core.workflow.engine import execute_recipe_run
 from core.secrets import get_active_key, is_mock_enabled
@@ -80,11 +81,11 @@ Steps:
         "Tip: Wrap multi-word names in quotes. Key/value pairs accept agent=, "
         "recipe=, etc."
     )
-   # NEW: Surface that /sop now also emits an orchestrator + fixed-agent bundle
+    # NEW: Surface that /sop now also emits an orchestrator + fixed-agent bundle
     st.markdown(
         "<small>New:</small> <em>/sop</em> also compiles an **Orchestrator** recipe and **Fixed-Agent** recipes (Intake/Plan/Act/Verify/Learn) from the same SOP. See the collapsible output after a run.",
-       unsafe_allow_html=True,
-     )
+        unsafe_allow_html=True,
+    )
 
 # --- Resolve active provider + key (NO silent fallback) ----------------------
 # Determine which LLM provider and key are active.  These values are pulled
@@ -169,6 +170,7 @@ def _handle_sop(cmd: SlashCommand) -> tuple[str, str, list, list, str, Optional[
         run = execute_recipe_run(db, agent_id=a.id, recipe_id=r.id)
         return a.name, r.name, tools, created, yml, getattr(run, "id", None)
 
+
 def _render_bundle_for_sop(cmd: SlashCommand, orchestrator_name: str) -> None:
     """
     NEW: Build and display the orchestrator + fixed-agent recipes derived from the same SOP.
@@ -185,6 +187,7 @@ def _render_bundle_for_sop(cmd: SlashCommand, orchestrator_name: str) -> None:
         st.caption("Tip: Attach the orchestrator recipe to a workflow or run it from the Dashboard.")
     except Exception as e:
         st.warning(f"Bundle generation skipped: {type(e).__name__}: {e}")
+
 
 def _slugify(name: str) -> str:
     """Normalize a name into a slug suitable for filenames."""
