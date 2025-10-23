@@ -131,12 +131,12 @@ def import_zip(
     dry_run: bool = False,
 ) -> Dict[str, Any]:
     """
-    Import a bundle produced by export_zip(), with robust fallbacks:
-      - Agents: accept agents.json or JSON files under agents/
-      - Recipes: accept recipes.json index; or fallback to recipes/*.yaml (parse name from YAML)
-      - Workflows: accept workflows.json; or fallback to workflows/*.json (normalize common keys)
-    Writes recipe YAMLs into recipes_dir (must be writable).
-    Returns detailed counts & messages.
+    Imports a previously exported bundle.
+    merge:
+      - "skip": keep existing, skip duplicates by name
+      - "overwrite": update existing objects in place
+      - "rename": keep both by appending a numeric suffix
+    Returns a report dict with created/updated/skipped counts and messages.
     """
     recipes_dir = Path(recipes_dir)
     result = {
@@ -147,34 +147,12 @@ def import_zip(
         "skipped": {"agents": 0, "recipes": 0, "workflows": 0},
         "messages": [],
     }
-
-    def _maybe_commit(db):
-        if not dry_run:
-            db.commit()
-
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as z, get_session() as db:
-        names = z.namelist()
-
         # ---------- Agents ----------
-        agents_rows: List[Dict[str, Any]] = []
-        if "agents.json" in names:
-            try:
-                agents_rows = json.loads(_read_text_from_zip(z, "agents.json"))
-                if not isinstance(agents_rows, list):
-                    raise ValueError("agents.json must be a list")
-            except Exception as e:
-                result["messages"].append(f"agents.json parse error: {e}")
-        else:
-            for n in names:
-                if n.startswith("agents/") and n.lower().endswith(".json"):
-                    try:
-                        agents_rows.append(json.loads(_read_text_from_zip(z, n)))
-                    except Exception as e:
-                        result["messages"].append(f"{n} parse error: {e}")
-
-        if agents_rows:
+        if "agents.json" in z.namelist():
+            agents = json.loads(z.read("agents.json").decode("utf-8"))
             existing = {a.name.lower(): a for a in db.query(Agent).all()}
-            for row in agents_rows:
+            for row in agents:
                 name = (row.get("name") or "").strip()
                 if not name:
                     result["messages"].append("Agent with empty name skipped.")
@@ -187,69 +165,32 @@ def import_zip(
                         continue
                     if merge == "rename":
                         i = 2
-                        candidate = f"{name} ({i})"
-                        while candidate.lower() in existing:
+                        new_name = f"{name} ({i})"
+                        while new_name.lower() in existing:
                             i += 1
-                            candidate = f"{name} ({i})"
-                        name = candidate
-                        key = name.lower()
-                  # OVERWRITE existing recipe
+                            new_name = f"{name} ({i})"
+                        name = new_name
                     elif merge == "overwrite":
                         if not dry_run:
-                            r = existing[key]
-                            fn = _slug(name) + ".yaml"
-                            (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
-                            if hasattr(r, "yaml_path"):
-                                r.yaml_path = fn
-                            # NEW: also keep inline copy
-                            if hasattr(r, "yaml"):
-                                setattr(r, "yaml", ytxt)
-                        result["updated"]["recipes"] += 1
+                            a = existing[key]
+                            a.domain = row.get("domain") or a.domain
+                            a.config_json = row.get("config_json") or a.config_json
+                        result["updated"]["agents"] += 1
                         continue
                 if not dry_run:
                     db.add(Agent(name=name, domain=row.get("domain") or "", config_json=row.get("config_json") or {}))
                 result["created"]["agents"] += 1
-            _maybe_commit(db)
-
+            if not dry_run:
+                db.commit()
         # ---------- Recipes ----------
-        recipes_index: List[Dict[str, str]] = []
-        if "recipes.json" in names:
-            try:
-                recipes_index = json.loads(_read_text_from_zip(z, "recipes.json"))
-                if not isinstance(recipes_index, list):
-                    raise ValueError("recipes.json must be a list")
-            except Exception as e:
-                result["messages"].append(f"recipes.json parse error: {e}")
-        else:
-            yaml_paths = [n for n in names if n.startswith("recipes/") and n.lower().endswith((".yml", ".yaml"))]
-            if yaml_paths:
-                _ensure_yaml(yaml)
-            for yp in yaml_paths:
-                ytxt = _read_text_from_zip(z, yp)
-                name = None
-                try:
-                    data = yaml.safe_load(ytxt) if yaml else None
-                    if isinstance(data, dict):
-                        name = (data.get("name") or "").strip()
-                except Exception:
-                    pass
-                if not name:
-                    fn = yp.split("/")[-1]
-                    name = re.sub(r"\\.ya?ml$", "", fn, flags=re.I).replace("_", " ").replace("-", " ").strip() or fn
-                recipes_index.append({"name": name, "file": yp})
-
-        if recipes_index:
-            recipes_dir.mkdir(parents=True, exist_ok=True)
+        recipe_map_by_name: Dict[str, str] = {}
+        if "recipes.json" in z.namelist():
+            recipe_index = json.loads(z.read("recipes.json").decode("utf-8"))
+            recipe_map_by_name = {r["name"]: r["file"] for r in recipe_index}
             existing = {r.name.lower(): r for r in db.query(Recipe).all()}
-            for entry in recipes_index:
-                name = (entry.get("name") or "").strip()
-                file_in_zip = entry.get("file")
-                if not name or not file_in_zip:
-                    result["messages"].append(f"Recipe entry invalid: {entry!r}")
-                    result["skipped"]["recipes"] += 1
-                    continue
-
-                ytxt = _read_text_from_zip(z, file_in_zip)
+            recipes_dir.mkdir(parents=True, exist_ok=True)
+            for name, file_in_zip in recipe_map_by_name.items():
+                ytxt = z.read(file_in_zip).decode("utf-8")
                 key = name.lower()
                 if key in existing:
                     if merge == "skip":
@@ -266,6 +207,7 @@ def import_zip(
                     elif merge == "overwrite":
                         if not dry_run:
                             r = existing[key]
+                            # Write new YAML file and update pointer if using yaml_path
                             fn = _slug(name) + ".yaml"
                             (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
                             if hasattr(r, "yaml_path"):
@@ -274,105 +216,76 @@ def import_zip(
                                 setattr(r, "yaml", ytxt)
                         result["updated"]["recipes"] += 1
                         continue
-                                     # CREATE new recipe
-                        if not dry_run:
-                            fn = _slug(name) + ".yaml"
-                            (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
-                            # NEW: store inline yaml too (works even if file is unreadable later)
-                            db.add(Recipe(name=name, yaml_path=fn, yaml=ytxt))
-                        result["created"]["recipes"] += 1
-            _maybe_commit(db)
-
+                # create new
+                if not dry_run:
+                    fn = _slug(name) + ".yaml"
+                    (recipes_dir / fn).write_text(ytxt, encoding="utf-8")
+                    db.add(Recipe(name=name, yaml_path=fn))
+                result["created"]["recipes"] += 1
+            if not dry_run:
+                db.commit()
         # ---------- Workflows ----------
-        workflows_rows: List[Dict[str, Any]] = []
-        if "workflows.json" in names:
-            try:
-                workflows_rows = json.loads(_read_text_from_zip(z, "workflows.json"))
-                if not isinstance(workflows_rows, list):
-                    raise ValueError("workflows.json must be a list")
-            except Exception as e:
-                result["messages"].append(f"workflows.json parse error: {e}")
-        else:
-            for n in names:
-                if n.startswith("workflows/") and n.lower().endswith(".json"):
-                    try:
-                        workflows_rows.append(json.loads(_read_text_from_zip(z, n)))
-                    except Exception as e:
-                        result["messages"].append(f"{n} parse error: {e}")
-
-        def norm_wf(row: Dict[str, Any]) -> Dict[str, Any]:
-            return {
-                "name": (row.get("name") or "").strip(),
-                "enabled": bool(row.get("enabled", True)),
-                "trigger": row.get("trigger") or row.get("trigger_type") or "manual",
-                "interval_minutes": row.get("interval_minutes") or row.get("trigger_value"),
-                "agent_name": row.get("agent_name") or row.get("agent_ref") or "",
-                "recipe_name": row.get("recipe_name") or row.get("recipe_ref") or "",
-            }
-
-        if workflows_rows:
-            existing_by_name = {wf.name.lower(): wf for wf in list_workflows(db)}
+        if "workflows.json" in z.namelist():
+            wfs = json.loads(z.read("workflows.json").decode("utf-8"))
+            existing_names = {wf.name.lower(): wf for wf in list_workflows(db)}
             agents_by_name = {a.name.lower(): a for a in db.query(Agent).all()}
             recipes_by_name = {r.name.lower(): r for r in db.query(Recipe).all()}
-
-            for raw in workflows_rows:
-                row = norm_wf(raw)
-                name = row["name"]
+            for row in wfs:
+                name = (row.get("name") or "").strip()
                 if not name:
-                    result["messages"].append(f"Workflow with empty/missing name skipped: {raw!r}")
+                    result["messages"].append("Workflow with empty name skipped.")
                     result["skipped"]["workflows"] += 1
                     continue
-
-                agent = agents_by_name.get((row["agent_name"] or "").lower())
-                recipe = recipes_by_name.get((row["recipe_name"] or "").lower())
+                agent = agents_by_name.get((row.get("agent_name") or "").lower())
+                recipe = recipes_by_name.get((row.get("recipe_name") or "").lower())
                 if not agent or not recipe:
                     result["messages"].append(
-                        f"Workflow '{name}' skipped — missing agent/recipe: "
-                        f"{row['agent_name']} / {row['recipe_name']}"
+                        f"Workflow '{name}' skipped (agent/recipe not found: {row.get('agent_name')} / {row.get('recipe_name')})."
                     )
                     result["skipped"]["workflows"] += 1
                     continue
-
                 key = name.lower()
-                if key in existing_by_name:
+                if key in existing_names:
+                    # Handle duplicates based on merge strategy
                     if merge == "skip":
                         result["skipped"]["workflows"] += 1
                         continue
                     if merge == "rename":
                         i = 2
                         candidate = f"{name} ({i})"
-                        while candidate.lower() in existing_by_name:
+                        while candidate.lower() in existing_names:
                             i += 1
                             candidate = f"{name} ({i})"
                         name = candidate
                         key = name.lower()
                     elif merge == "overwrite":
                         if not dry_run:
-                            wf = existing_by_name[key]
+                            wf = existing_names[key]
                             update_workflow(
                                 db, wf.id,
                                 name=name,
                                 agent_id=agent.id,
                                 recipe_id=recipe.id,
-                                trigger_type=row["trigger"],
-                                trigger_value=row["interval_minutes"],
-                                enabled=1 if row["enabled"] else 0,
+                                trigger_type=row.get("trigger", getattr(wf, "trigger_type", "manual")),
+                                trigger_value=row.get("interval_minutes", getattr(wf, "trigger_value", None)),
+                                enabled=1 if row.get("enabled", True) else 0,
                             )
                         result["updated"]["workflows"] += 1
                         continue
-                # create new
+                # Create new workflow
                 if not dry_run:
                     new_wf = create_workflow(
                         db,
                         name=name,
                         agent_id=agent.id,
                         recipe_id=recipe.id,
-                        trigger_type=row["trigger"],
-                        trigger_value=row["interval_minutes"],
+                        trigger_type=row.get("trigger", "manual"),
+                        trigger_value=row.get("interval_minutes"),
                     )
-                    if not row["enabled"]:
+                    # If the imported workflow was disabled, reflect that
+                    if not row.get("enabled", True):
                         update_workflow(db, new_wf.id, enabled=0)
                 result["created"]["workflows"] += 1
-            _maybe_commit(db)
-
+            if not dry_run:
+                db.commit()
     return result
