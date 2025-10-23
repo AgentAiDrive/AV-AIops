@@ -22,11 +22,11 @@ def _fetch_pil_image(url: str) -> Image.Image | None:
     except (requests.RequestException, UnidentifiedImageError, OSError):
         return None
 
-_icon_img = _fetch_pil_image(LOGO_URL)
+_icon_img = _fetch_pil_image(ICON_URL)
 
 # ---------- Page config (must be first Streamlit command) ----------
 
-st.set_page_config(page_title="Agentic Ops IPAV", page_icon= ipav.ico, layout="wide")
+st.set_page_config(page_title="Agentic Ops IPAV", page_icon= _icon_img, layout="wide")
 
 # ---------- Header ----------
 st.image(ICON_URL, caption="", width=293)
