@@ -4,8 +4,23 @@ import streamlit as st
 from pathlib import Path
 from core.db.seed import init_db
 
-st.set_page_config(page_title="Agentic Ops IPAV", page_icon="🎛️", layout="wide")
-st.title("Agentic Ops - IPAV Workflow Orchestration")
+LOGO_URL = "https://github.com/user-attachments/assets/00c68a1d-224f-4170-b44f-9982bf4b5e8d"
+ICON_URL = "https://raw.githubusercontent.com/AgentAiDrive/AV-AIops/refs/heads/IPAV-Agents/sma-av-streamlit/ipav.ico"
+def _fetch_pil_image(url: str) -> Image.Image | None:
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        img = Image.open(BytesIO(r.content))
+        img.load()  # force load to avoid lazy issues
+        return img
+    except (requests.RequestException, UnidentifiedImageError, OSError):
+        return None
+_icon_img = _fetch_pil_image(ICON_URL)
+
+# ---------- Page config (must be first Streamlit command) ----------
+st.set_page_config(page_title="Agentic SOP Workflows", page_icon= _icon_img, layout="wide")
+
+st.title("Agentic SOP Workflow Orchestration - IPAV")
 st.write("Use sidebar to navigate.")
 
 def model_light():
