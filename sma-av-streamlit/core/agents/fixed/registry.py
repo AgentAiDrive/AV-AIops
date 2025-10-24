@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # ...your existing imports...
 from .kb_publisher import KBPublisher
+FIXED_AGENT_REGISTRY = FIXED_AGENT
 
 FIXED_AGENT = [
     "BaselineAgent",        # safety + policy preflight (risk windows, RBAC, secrets)
