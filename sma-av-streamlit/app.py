@@ -71,7 +71,6 @@ except Exception:
         ),
     }
 
-
 # ---------------- Path resolution (robust) ----------------
 def find_repo_root() -> Path:
     """Walk up from this file to find the app root (where app.py / core / pages live)."""
@@ -104,7 +103,7 @@ else:
     st.success(f"Loaded runbook: `{runbook_path}`")
 
 # ---------------- Global tips summary ----------------
-with st.expander("Global Page Tips (quick reference)", expanded=True):
+with st.expander("Global Page Tips (quick reference)", expanded=False):
     cols = st.columns(2)
     keys = list(PAGE_TIPS.keys())
     for i, k in enumerate(keys):
@@ -137,7 +136,7 @@ if q.strip():
     pat = re.compile(re.escape(q), re.IGNORECASE)
     filtered_md = pat.sub(lambda m: f"**{m.group(0)}**", runbook_md)
 
-with st.expander("Table of Contents", expanded=True):
+with st.expander("Table of Contents", expanded=False):
     if not toc:
         st.caption("No headings found.")
     else:
@@ -149,22 +148,5 @@ st.download_button("Download RUNBOOK.md", data=runbook_md, file_name="RUNBOOK.md
 
 st.divider()
 st.markdown(filtered_md, unsafe_allow_html=False)
-
-# ---------------- Optional debug (moved to bottom) ----------------
-def _get_query_params():
-    try:
-        # Newer Streamlit
-        return dict(st.query_params)
-    except Exception:
-        # Back-compat
-        return st.experimental_get_query_params()  # type: ignore[attr-defined]
-
-qp = _get_query_params()
-debug_on = str(qp.get("debug", ["0"])[0]).lower() in ("1", "true", "yes")
-
-with st.expander("Debug: where I'm looking for RUNBOOK.md", expanded=debug_on):
-    st.caption(f"App root resolved to: `{APP_ROOT}`")
-    st.caption(f"Working dir: `{CWD}`")
-    st.code("\n".join(str(c) for c in candidates), language="text")
 
 init_db()
