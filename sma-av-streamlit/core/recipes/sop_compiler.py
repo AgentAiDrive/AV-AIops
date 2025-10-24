@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 from .schema import OrchestratorRecipe, FixedAgentRecipe, MCPBinding, ToolMethod, Step
 from .storage import save_yaml
-from core.agents.fixed.registry import FIXED_AGENTS
+#from core.agents.fixed.registry import FIXED_AGENTS
 
 def _tool_binding_from_call(call: str) -> Tuple[str, str]:
     # "qsys_api.load_snapshot" -> ("qsys_api","load_snapshot")
