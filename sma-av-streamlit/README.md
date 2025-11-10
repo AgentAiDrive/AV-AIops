@@ -3,8 +3,8 @@
 
 **The Agentic Ops IPAV application provides a suite of features for creating AI-driven operational workflows using NLP, MCP and converting SOP's into agentic recipes YAML and JSON.**
 
-**Try Demo Now:**
-https://agentic-ops-ipav.streamlit.app/
+**Try Updated Demo Now:**
+https://agenticAV.streamlit.app/
 
 **Do NOT Save Key in Online Demo!**
 
